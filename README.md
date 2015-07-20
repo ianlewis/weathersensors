@@ -57,3 +57,26 @@ The Raspberry Pi will run an aggregation program written in Go. The app will
 poll each of the sensors and forward the data to BigQuery. One way to forward
 the data would be to use fluentd and the BigQuery plugin to forward the data
 but it may just be easier to have the Go program do that.
+
+
+## Aggregation App
+
+TODO
+
+## Spark-Server
+
+A spark-server instance will be run on the Raspberry Pi and the individual photons
+will be registered there. That will allow pushing code updates remotely without relying
+on the particle.io cloud services.
+
+TODO
+
+# Notes
+
+## Local Development
+
+Flashing devices locally requires the
+[particle-cli](https://github.com/spark/particle-cli) and
+[dfu-util](http://dfu-util.sourceforge.net/).
+
+I haven't figured out how to compile locally yet.
