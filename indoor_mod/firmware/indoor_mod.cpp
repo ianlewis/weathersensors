@@ -1,6 +1,8 @@
 // Original Spark Community Thread: http://community.spark.io/t/how-to-access-the-core-via-we-browser/9711
 // Code adapted from: http://arduino.cc/en/Tutorial/WebServer
 
+#include "application.h"
+
 /* Includes ------------------------------------------------------------------*/  
 TCPServer server = TCPServer(80);
 TCPClient client;
