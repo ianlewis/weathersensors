@@ -1,56 +1,123 @@
 // Original Spark Community Thread: http://community.spark.io/t/how-to-access-the-core-via-we-browser/9711
 // Code adapted from: http://arduino.cc/en/Tutorial/WebServer
 
+/* Includes ------------------------------------------------------------------*/  
 #include "application.h"
 
-/* Includes ------------------------------------------------------------------*/  
-TCPServer server = TCPServer(80);
-TCPClient client;
+const String VERSION = String("1.0");
+String deviceName = String("Unknown");
 
-void setup()
-{
-    // start listening for clients
-    server.begin();
+void log(String msg) {
+    Serial.println(String("[") + String(Time.now()) + String("] ") + msg);
 }
 
-void loop() {
+void deviceNameHandler(const char *topic, const char *data) {
+    deviceName = String(data);
+    log("Got device name: " + deviceName);
+}
+
+bool statusOk = false;
+
+// How often we check the status in seconds.
+const int STATUS_INTERVAL = 10;
+const int NUM_LOOPS = 1000;
+int loops = 0;
+int nextStatus = 0;
+
+
+// Update the status but only if we haven't
+// printed the status recently.
+bool checkStatus() {
+    char ipAddress[15]; // holds the ip address
+    int now;
+
+    if (loops >= NUM_LOOPS) {
+        now = Time.now();
+        if (now >= nextStatus) {
+            statusOk = WiFi.ready();
+            if (statusOk) {
+                // Once wifi is ready print the status and our IP address.
+                IPAddress localIP = WiFi.localIP();
+                sprintf(ipAddress, "%d.%d.%d.%d", localIP[0], localIP[1], localIP[2], localIP[3]);
+            } else {
+                sprintf(ipAddress, "<none>");
+            }
+
+            log("PING: DEVICE: " + deviceName + "; VERSION: " + VERSION + "; IP: " + ipAddress);
+
+            nextStatus = now + STATUS_INTERVAL;
+        }
+
+        loops = 0;
+    } else {
+        loops += 1;   
+    }
+
+    return statusOk;
+}
+
+
+TCPServer server = TCPServer(5000);
+TCPClient client;
+
+const int REQ_MAX_BUF_SIZE = 1000;
+char REQ_BUF[REQ_MAX_BUF_SIZE];
+int REQ_BUF_SIZE = -1;
+
+void serverMain() {
     // listen for incoming clients
     client = server.available();
     if (client) {
         // an http request ends with a blank line
-        boolean currentLineIsBlank = true;
+        if (client.connected()) {
+            log(String("Client connected."));
+        }
         while (client.connected()) {
+            // Check status while in this loop as well.
+            checkStatus();
+
             if (client.available()) {
-                char c = client.read();
-                // if you've gotten to the end of the line (received a newline
-                // character) and the line is blank, the http request has ended,
-                // so you can send a reply
-                if (c == '\n' && currentLineIsBlank) {
-                    // send a standard http response header
-                    client.println("HTTP/1.1 200 OK");
-                    client.println("Content-Type: application/json");
-                    client.println("Connection: close");  // the connection will be closed after completion of the response
-                    client.println();
-                    client.print("{\"time\": \"");
-                    client.print(Time.timeStr());
-                    client.println("\"}");
-                    client.println();
-                    delay(5);
-                    break;
-                }
-                if (c == '\n') {
-                    // you're starting a new line
-                    currentLineIsBlank = true;
-                }
-                else if (c != '\r') {
-                    // you've gotten a character on the current line
-                    currentLineIsBlank = false;
-                }
+                REQ_BUF_SIZE += 1;
+                REQ_BUF[REQ_BUF_SIZE] = client.read();
+            }
+            if (REQ_BUF[REQ_BUF_SIZE] == '\n') {
+                // Replace the new line character with string termination.
+                REQ_BUF[REQ_BUF_SIZE] = '\0';
+                log(String(REQ_BUF));
+
+                // Reset the request buffer.
+                REQ_BUF_SIZE = -1;
             }
         }
-        // give the web browser time to receive the data
-        delay(1);
-        // close the connection:
-        client.stop();
+        log(String("Client disconnected."));
     }
+}
+
+// Lists all sensors on this module.
+void list() {
+
+}
+
+void get(String sensor) {
+
+}
+
+void setup() {
+    // start listening for clients
+    Serial.begin(115200);
+
+    log("Getting device name...");
+    Spark.subscribe("spark/device/name", deviceNameHandler);
+    Spark.publish("spark/device/name");
+
+    log("Starting server...");
+    server.begin();
+}
+
+
+
+// The main loop that gets run forever.
+void loop() {
+    checkStatus();
+    serverMain();
 }
