@@ -57,6 +57,57 @@ bool checkStatus() {
 }
 
 
+// Lists all sensors on this module.
+String list() {
+    return "TEMP:HUMIDITY";
+}
+
+
+String getTemp() {
+    // TODO
+    return "123"; 
+}
+
+String getHumidity() {
+    // TODO
+    return "456"; 
+}
+
+String get(String sensor) {
+    if (sensor == "TEMP") {
+        return getTemp();
+    } else if (sensor == "HUMIDITY") {
+        return getHumidity();
+    } else {
+        return "ERROR";
+    }
+}
+
+String getResponse(String req) {
+    req.trim();
+
+    String rest = req;
+    String cmd;
+
+    int i = rest.indexOf(' ');
+    if (i != -1) {
+        cmd = rest.substring(0, i);
+        rest = rest.substring(i);
+        rest.trim();
+    } else {
+        cmd = rest;
+        rest = String("");
+    }
+
+    if (cmd == "LIST") {
+        return list();
+    } else if (cmd == "GET") {
+        return get(rest);
+    } else {
+        return String("ERROR");
+    }
+}
+
 TCPServer server = TCPServer(5000);
 TCPClient client;
 
@@ -83,7 +134,12 @@ void serverMain() {
             if (REQ_BUF[REQ_BUF_SIZE] == '\n') {
                 // Replace the new line character with string termination.
                 REQ_BUF[REQ_BUF_SIZE] = '\0';
+
+                // Log the request.
                 log(String(REQ_BUF));
+
+                // Send a response.
+                client.println(getResponse(String(REQ_BUF)));
 
                 // Reset the request buffer.
                 REQ_BUF_SIZE = -1;
@@ -93,14 +149,6 @@ void serverMain() {
     }
 }
 
-// Lists all sensors on this module.
-void list() {
-
-}
-
-void get(String sensor) {
-
-}
 
 void setup() {
     // start listening for clients
