@@ -1,0 +1,4 @@
+[submodule "indoor_mod/firmware/firmware"]
+	path = indoor_mod/firmware/firmware
+	url = https://github.com/spark/firmware.git
+	branch = develop
