@@ -4,7 +4,7 @@
 export PLATFORM=photon
 
 all:
-	rm -f firmware/user/src/application.cpp
+	rm -f firmware/user/src/*
 	cp -r src/* firmware/user/src/
 	$(MAKE) -C firmware/main
 
