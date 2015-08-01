@@ -3,12 +3,30 @@
 
 /* Includes ------------------------------------------------------------------*/  
 #include "application.h"
+#include "PietteTech_DHT.h"
 
+const int READ_LED = D0;
+const int DHTPIN = D1;
+const int PORT = 5000;
 const String VERSION = String("1.0");
 String deviceName = String("Unknown");
 
+
+void dht_wrapper(); // must be declared before the lib initialization
+
+// Initialize the DHT22 sensor.
+PietteTech_DHT dht(DHTPIN, DHT22, dht_wrapper);
+
+// This wrapper is in charge of calling
+// mus be defined like this for the lib work
+void dht_wrapper() {
+    dht.isrCallback();
+}
+
 void log(String msg) {
-    Serial.println(String("[") + String(Time.now()) + String("] ") + msg);
+    if (Serial.available()) {
+        Serial.println(String("[") + String(Time.now()) + String("] ") + msg);
+    }
 }
 
 void deviceNameHandler(const char *topic, const char *data) {
@@ -16,26 +34,18 @@ void deviceNameHandler(const char *topic, const char *data) {
     log("Got device name: " + deviceName);
 }
 
-bool statusOk = false;
+int nextPingTime = 0;
+int pingLoops = 0;
 
-// How often we check the status in seconds.
-const int STATUS_INTERVAL = 10;
-const int NUM_LOOPS = 1000;
-int loops = 0;
-int nextStatus = 0;
-
-
-// Update the status but only if we haven't
-// printed the status recently.
-bool checkStatus() {
-    char ipAddress[15]; // holds the ip address
+void debugPing(int seconds, bool conn) {
     int now;
 
-    if (loops >= NUM_LOOPS) {
+    char ipAddress[15]; // holds the ip address
+
+    if (pingLoops > seconds * 100) {
         now = Time.now();
-        if (now >= nextStatus) {
-            statusOk = WiFi.ready();
-            if (statusOk) {
+        if (now > nextPingTime) {
+            if (WiFi.ready()) {
                 // Once wifi is ready print the status and our IP address.
                 IPAddress localIP = WiFi.localIP();
                 sprintf(ipAddress, "%d.%d.%d.%d", localIP[0], localIP[1], localIP[2], localIP[3]);
@@ -43,77 +53,48 @@ bool checkStatus() {
                 sprintf(ipAddress, "<none>");
             }
 
-            log("PING: DEVICE: " + deviceName + "; VERSION: " + VERSION + "; IP: " + ipAddress);
-
-            nextStatus = now + STATUS_INTERVAL;
+            log("PING: DEVICE: " + deviceName + "; VERSION: " + VERSION + "; IP: " + ipAddress + "; PORT: " + String(PORT) + "; CLIENT: " + String(conn));
+            nextPingTime = now + seconds;
         }
-
-        loops = 0;
+        pingLoops = 0;
     } else {
-        loops += 1;   
-    }
-
-    return statusOk;
-}
-
-
-// Lists all sensors on this module.
-String list() {
-    return "TEMP:HUMIDITY";
-}
-
-
-String getTemp() {
-    // TODO
-    return "123"; 
-}
-
-String getHumidity() {
-    // TODO
-    return "456"; 
-}
-
-String get(String sensor) {
-    if (sensor == "TEMP") {
-        return getTemp();
-    } else if (sensor == "HUMIDITY") {
-        return getHumidity();
-    } else {
-        return "ERROR";
+        pingLoops += 1;
     }
 }
 
-String getResponse(String req) {
-    req.trim();
+int nextStatusTime = 0;
+int statusLoops = 0;
 
-    String rest = req;
-    String cmd;
+void sendStatus(TCPClient client, int seconds) {
+    int now;
+    float temp, humidity;
+    if (statusLoops > seconds * 100) {
+        now = Time.now();
+        if (now > nextStatusTime) {
+            // Turn on the READ LED.
+            digitalWrite(READ_LED, HIGH);
 
-    int i = rest.indexOf(' ');
-    if (i != -1) {
-        cmd = rest.substring(0, i);
-        rest = rest.substring(i);
-        rest.trim();
+            humidity = dht.readHumidity();
+            temp = dht.readTemperature();
+
+            client.println(String("temp:") + String(temp) + String("\thumidity:") + String(humidity));
+            nextStatusTime = now + seconds;
+
+            // Delay so that the READ LED stays on
+            // for a little longer.
+            // This won't have an effect on the loop unless it
+            // exceeds the nextStatusTime
+            delay(100);
+            digitalWrite(READ_LED, LOW);
+        }
+        statusLoops = 0;
     } else {
-        cmd = rest;
-        rest = String("");
-    }
-
-    if (cmd == "LIST") {
-        return list();
-    } else if (cmd == "GET") {
-        return get(rest);
-    } else {
-        return String("ERROR");
+        statusLoops += 1;
     }
 }
 
-TCPServer server = TCPServer(5000);
+TCPServer server = TCPServer(PORT);
 TCPClient client;
-
-const int REQ_MAX_BUF_SIZE = 1000;
-char REQ_BUF[REQ_MAX_BUF_SIZE];
-int REQ_BUF_SIZE = -1;
 
 void serverMain() {
     // listen for incoming clients
@@ -124,29 +105,15 @@ void serverMain() {
             log(String("Client connected."));
         }
         while (client.connected()) {
-            // Check status while in this loop as well.
-            checkStatus();
-
-            if (client.available()) {
-                REQ_BUF_SIZE += 1;
-                REQ_BUF[REQ_BUF_SIZE] = client.read();
-            }
-            if (REQ_BUF[REQ_BUF_SIZE] == '\n') {
-                // Replace the new line character with string termination.
-                REQ_BUF[REQ_BUF_SIZE] = '\0';
-
-                // Log the request.
-                log(String(REQ_BUF));
-
-                // Send a response.
-                client.println(getResponse(String(REQ_BUF)));
-
-                // Reset the request buffer.
-                REQ_BUF_SIZE = -1;
-            }
+            // Send LTSV to client.
+            sendStatus(client, 5);
+            debugPing(10, true);
+    
         }
         log(String("Client disconnected."));
     }
+
+    debugPing(10, false);
 }
 
 
@@ -160,12 +127,15 @@ void setup() {
 
     log("Starting server...");
     server.begin();
+
+    log("Starting DHT22 sensor...");
+
+    pinMode(READ_LED, OUTPUT);
 }
 
 
 
 // The main loop that gets run forever.
 void loop() {
-    checkStatus();
     serverMain();
 }
