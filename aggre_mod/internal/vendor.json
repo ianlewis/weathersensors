@@ -1,0 +1,12 @@
+{
+	"comment": "",
+	"package": [
+		{
+			"canonical": "github.com/najeira/ltsv",
+			"comment": "",
+			"local": "bitbucket.org/IanLewis/aggre_mod/internal/github.com/najeira/ltsv",
+			"revision": "40eb84a5b5d21afa8f26f357445d910c62011166",
+			"revisionTime": "2015-03-03T16:35:28+09:00"
+		}
+	]
+}
