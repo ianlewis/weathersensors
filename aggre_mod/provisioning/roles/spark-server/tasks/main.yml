@@ -1,0 +1,54 @@
+- apt: update_cache=yes
+
+- name: Install required packages
+  action: apt pkg={{ item }} state=present
+  with_items:
+    - git
+    - htop
+    - rng-tools
+    - libusb-1.0-0-dev
+
+- name: Enable hardware random number generator
+  modprobe: name=bcm2708_rng state=present
+
+- name: Download node package.
+  get_url: 
+    url="http://node-arm.herokuapp.com/node_latest_armhf.deb"
+    dest="/tmp/node_latest_armhf.deb"
+
+- name: Install node
+  apt: deb="/tmp/node_latest_armhf.deb"
+
+- name: Download dfu-util 0.8
+  get_url: 
+    url=http://dfu-util.sourceforge.net/releases/dfu-util-0.8.tar.gz
+    dest=/tmp/dfu-util-0.8.tar.gz
+
+- name: Unarchive dfu-util 0.8
+  unarchive: 
+    src=/tmp/dfu-util-0.8.tar.gz
+    dest=/tmp
+    copy=no
+#  creates: /tmp/dfu-util-0.8/Makefile
+
+- name: Install dfu-util
+  shell: 'cd /tmp/dfu-util-0.8;{{ item }}'
+#  creates: /usr/local/bin/dfu-util
+  with_items:
+    - ./configure
+    - make
+    - make install
+    - ldconfig
+
+# TODO: serialport doesn't build on ARM
+- name: Install particle-cli
+  shell: 'npm install -g particle-cli'
+
+- name: Install spark-server
+  shell: '{{ item }}'
+#  creates: /usr/local/bin/spark-server
+  with_items:
+    - git clone https://github.com/spark/spark-server.git /usr/local/share/spark-server
+    - cd /usr/local/share/spark-server; npm install
+
+# TODO: Add init.d script for spark-server 
