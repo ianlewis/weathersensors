@@ -2,3 +2,6 @@
 	path = indoor_mod/firmware/firmware
 	url = https://github.com/spark/firmware.git
 	branch = develop
+[submodule "aggre_mod/vendor/github.com/najeira/ltsv"]
+	path = aggre_mod/vendor/github.com/najeira/ltsv
+	url = https://github.com/najeira/ltsv.git
