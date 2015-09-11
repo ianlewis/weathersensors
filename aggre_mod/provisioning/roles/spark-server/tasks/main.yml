@@ -1,5 +1,8 @@
 - apt: update_cache=yes
 
+- name: Create sparkserver user
+  action: user name=sparkserver
+
 - name: Install required packages
   action: apt pkg={{ item }} state=present
   with_items:
@@ -40,9 +43,10 @@
     - make install
     - ldconfig
 
-# TODO: serialport doesn't build on ARM
+# NOTE: serialport doesn't install on the Raspberry Pi
+# so it needs --unsafe-perm as a workaround.
 - name: Install particle-cli
-  shell: 'npm install -g particle-cli'
+  shell: 'npm install -g particle-cli --unsafe-perm'
 
 - name: Install spark-server
   shell: '{{ item }}'
@@ -50,5 +54,8 @@
   with_items:
     - git clone https://github.com/spark/spark-server.git /usr/local/share/spark-server
     - cd /usr/local/share/spark-server; npm install
+
+- name: Change owner for spark-server
+  file: path=/usr/local/share/spark-server owner=sparkserver group=sparkserver recurse=yes
 
 # TODO: Add init.d script for spark-server 
