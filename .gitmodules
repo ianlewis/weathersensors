@@ -5,3 +5,6 @@
 [submodule "aggre_mod/vendor/github.com/najeira/ltsv"]
 	path = aggre_mod/vendor/github.com/najeira/ltsv
 	url = https://github.com/najeira/ltsv.git
+[submodule "aggre_mod/vendor/github.com/gorilla/handlers"]
+	path = aggre_mod/vendor/github.com/gorilla/handlers
+	url = https://github.com/gorilla/handlers.git
