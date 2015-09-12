@@ -4,12 +4,16 @@
 /* Includes ------------------------------------------------------------------*/  
 #include "application.h"
 #include "PietteTech_DHT.h"
+#include "HttpClient.h"
+
+const String AGGRE_HOST = String("192.168.1.11");
+const int AGGRE_PORT = 8000;
 
 const int READ_LED = D0;
 const int DHTPIN = D1;
 const int PORT = 5000;
 const String VERSION = String("1.0");
-String deviceName = String("Unknown");
+String deviceName = String("");
 
 
 void dht_wrapper(); // must be declared before the lib initialization
@@ -33,6 +37,54 @@ void deviceNameHandler(const char *topic, const char *data) {
     deviceName = String(data);
     log("Got device name: " + deviceName);
 }
+
+HttpClient http;
+
+// Headers currently need to be set at init, useful for API keys etc.
+http_header_t headers[] = {
+    { "Content-Type", "application/x-www-form-urlencoded" },
+    { "Accept" , "*/*"},
+    { NULL, NULL } // NOTE: Always terminate headers will NULL
+};
+
+http_request_t request;
+http_response_t response;
+
+int nextRegisterTime = 0;
+int registerLoops = 0;
+
+void registerWithAggreHost(int seconds) {
+    // Wait for the device name.
+    while (deviceName.equals("")) {
+        delay(1);
+    }
+
+    int now;
+    char ipAddress[15]; // holds the ip address
+
+    if (registerLoops > seconds * 100) {
+        now = Time.now();
+        if (now > nextRegisterTime) {
+            IPAddress localIP = WiFi.localIP();
+            sprintf(ipAddress, "%d.%d.%d.%d", localIP[0], localIP[1], localIP[2], localIP[3]);
+
+            request.hostname = AGGRE_HOST;
+            request.port = AGGRE_PORT;
+            request.path = "/api/devices";
+            request.body = "name=" + deviceName + "&address=" + ipAddress + "%3A" + PORT;
+
+            log("Registering device: " + deviceName);
+            http.post(request, response, headers);
+            log("Registered device with status: " + String(response.status));
+
+            nextRegisterTime = now + seconds;
+        }
+        registerLoops = 0;
+    } else {
+        registerLoops += 1;
+    }
+}
+
 
 int nextPingTime = 0;
 int pingLoops = 0;
@@ -114,6 +166,7 @@ void serverMain() {
     }
 
     debugPing(10, false);
+    registerWithAggreHost(30);
 }
 
 
