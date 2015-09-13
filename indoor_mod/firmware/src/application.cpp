@@ -27,6 +27,20 @@ void dht_wrapper() {
     dht.isrCallback();
 }
 
+#define ONE_DAY_MILLIS (24 * 60 * 60 * 1000)
+unsigned long lastSync = millis();
+
+/*
+ * Sync the device time with the spark server.
+ */
+void syncTime() {
+    if (millis() - lastSync > ONE_DAY_MILLIS) {
+        // Request time synchronization from the Particle Cloud
+        Spark.syncTime();
+        lastSync = millis();
+    }
+}
+
 void log(String msg) {
     if (Serial.available()) {
         Serial.println(String("[") + String(Time.now()) + String("] ") + msg);
@@ -129,7 +143,7 @@ void sendStatus(TCPClient client, int seconds) {
             humidity = dht.readHumidity();
             temp = dht.readTemperature();
 
-            client.println(String("temp:") + String(temp) + String("\thumidity:") + String(humidity));
+            client.println(String("timestamp:") + String(now) + String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity));
             nextStatusTime = now + seconds;
 
             // Delay so that the READ LED stays on
@@ -160,13 +174,11 @@ void serverMain() {
             // Send LTSV to client.
             sendStatus(client, 5);
             debugPing(10, true);
-    
         }
         log(String("Client disconnected."));
     }
 
     debugPing(10, false);
-    registerWithAggreHost(30);
 }
 
 
@@ -190,5 +202,14 @@ void setup() {
 
 // The main loop that gets run forever.
 void loop() {
+    // Sync with the Spark server if necessary.
+    syncTime();
+
+    // Run the main server loop.
+    // NOTE: The server main function will not return while
+    // a client has connected.
     serverMain();
+
+    // Register with the aggregation server.
+    registerWithAggreHost(30);
 }
