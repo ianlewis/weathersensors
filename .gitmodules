@@ -8,3 +8,6 @@
 [submodule "aggre_mod/vendor/github.com/gorilla/handlers"]
 	path = aggre_mod/vendor/github.com/gorilla/handlers
 	url = https://github.com/gorilla/handlers.git
+[submodule "aggre_mod/vendor/github.com/google/google-api-go-client"]
+	path = aggre_mod/vendor/github.com/google/google-api-go-client
+	url = https://github.com/google/google-api-go-client.git

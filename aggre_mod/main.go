@@ -10,13 +10,21 @@ import (
 	"io"
 	"io/ioutil"
 	"time"
+	"strconv"
 
 	"github.com/gorilla/handlers"
     "github.com/najeira/ltsv"
+
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
+	"github.com/google/google-api-go-client/bigquery/v2"  // bigquery
 )
 
 var (
 	addr = flag.String("addr", "0.0.0.0:8000", "The address to bind the server to.")
+	bqproject = flag.String("project", "", "The BigQuery project.")
+	bqdataset = flag.String("dataset", "", "The BigQuery dataset.")
+	bqtable = flag.String("table", "", "The BigQuery table to stream to.")
 	timeout = flag.Int("timeout", 30, "The device read timeout in seconds.")
 	debug = flag.Bool("debug", false, "Enable debug logging.")
 )
@@ -96,7 +104,7 @@ func (dh *DeviceHandler) Handle() {
 				return
 			}
 
-			Error.Printf("Error reading data from %s: %v", dh.Device.Address, err)
+			Error.Printf("Error reading data from %s (%s): %v", dh.Device.Name, dh.Device.Address, err)
 		}
     }
 }
@@ -106,18 +114,9 @@ func (dh *DeviceHandler) Finish() {
 }
 
 func monitorDevices() {
-	for {
-		select {
-		case d := <-deviceChan:
-			// Add new device handlers.
-			Info.Printf("Got new device %s at %s", d.Name, d.Address)
-
-			deviceHandlers[d.Name] = &DeviceHandler{
-				Device: d,
-				Done: false,
-			}
-			go deviceHandlers[d.Name].Handle()
-		default:
+	// Create a goroutine to clean up device handlers.
+	go func() {
+		for {
 			// Delete finished device handlers.
 			var toDelete []string
 			for n,h := range deviceHandlers {
@@ -130,18 +129,76 @@ func monitorDevices() {
 				Info.Printf("Removing %s.", n)
 				delete(deviceHandlers, n)
 			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	for {
+		// Block on the device channel.
+		d := <-deviceChan
+
+		// Add new device handlers.
+		Info.Printf("Got new device %s at %s", d.Name, d.Address)
+
+		deviceHandlers[d.Name] = &DeviceHandler{
+			Device: d,
+			Done: false,
+		}
+		go deviceHandlers[d.Name].Handle()
+	}
+}
+
+func addFloatValue(name string, jsonValue map[string]bigquery.JsonValue, data DataPoint) {
+	if data.Data[name] != "" {
+		if val, err := strconv.ParseFloat(data.Data[name], 64); err == nil {
+			jsonValue[name] = val
+		} else {
+			Error.Printf("Error parsing %s data from %s: %v", name, data.Device.Name, err)
 		}
 	}
 }
 
 // Proceses data in parallel
-func processData() {
+func processData(s *bigquery.Service) {
+
 	for {
 		// Block on the data channel.
 		data := <-dataChan
+
+		jsonValue := make(map[string]bigquery.JsonValue)
+
+		jsonValue["name"] = data.Device.Name
+
+		timestamp, err := strconv.ParseInt(data.Data["timestamp"], 10, 64)
+		if err != nil {
+			Error.Printf("Error reading timestamp from %s (%s): %v", data.Device.Name, data.Device.Address, err)
+			continue
+		}
+
+		jsonValue["timestamp"] = timestamp
+		addFloatValue("temp", jsonValue, data)
+		addFloatValue("humidity", jsonValue, data)
+		addFloatValue("windspeed", jsonValue, data)
+		addFloatValue("winddirection", jsonValue, data)
+		addFloatValue("rainfall", jsonValue, data)
+
 		// Got a data point
 		// TODO: Send data to Fluentd (or directly to BigQuery?)
-		Debug.Printf("%s: %s", data.Device.Name, data.Data)
+		_, err = s.Tabledata.InsertAll(*bqproject, *bqdataset, *bqtable, &bigquery.TableDataInsertAllRequest{
+			Kind: "bigquery#tableDataInsertAllRequest",
+			Rows: []*bigquery.TableDataInsertAllRequestRows{
+				&bigquery.TableDataInsertAllRequestRows{
+					Json: jsonValue,
+				},
+			},
+		}).Do()
+
+		if err != nil {
+			Error.Printf("Could not send data from %s to BigQuery: %v", data.Device.Name, err)
+		} else {
+			Debug.Printf("Data sent to BigQuery (%s): %s", data.Device.Name, data.Data)
+		}
 	}
 }
 
@@ -176,14 +233,23 @@ func apiServer() {
     Error.Fatal(http.ListenAndServe(*addr, nil))
 }
 
-
 func main() {
     flag.Parse()
 
 	initLogging()
 
+	ctx := context.Background()
+	client, err := google.DefaultClient(ctx, bigquery.BigqueryScope)
+	if err != nil {
+		Error.Fatal("Could not create Bigquery client.", err)
+	}
+	service, err := bigquery.New(client)
+	if err != nil {
+		Error.Fatal("Could not create Bigquery client.", err)
+	}
+
 	// Start the thead to process data.
-	go processData()
+	go processData(service)
 
 	// Start the api server
 	go apiServer()
