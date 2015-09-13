@@ -46,7 +46,10 @@ type DataPoint struct {
 	Data map[string]string
 }
 
+// Channel used to send data to the processData() goroutine
 var dataChan = make(chan DataPoint, 1000)
+
+// Channel used to 
 var deviceChan = make(chan Device, 100)
 
 func initLogging() {
@@ -113,39 +116,24 @@ func (dh *DeviceHandler) Finish() {
 	dh.Done = true
 }
 
-func monitorDevices() {
+func cleanupDevices() {
 	// Create a goroutine to clean up device handlers.
-	go func() {
-		for {
-			// Delete finished device handlers.
-			var toDelete []string
-			for n,h := range deviceHandlers {
-				if h.Done {
-					Info.Printf("%s disconnected.", n)
-					toDelete = append(toDelete, n)
-				}
-			}
-			for _,n := range toDelete {
-				Info.Printf("Removing %s.", n)
-				delete(deviceHandlers, n)
-			}
-
-			time.Sleep(5 * time.Second)
-		}
-	}()
-
 	for {
-		// Block on the device channel.
-		d := <-deviceChan
-
-		// Add new device handlers.
-		Info.Printf("Got new device %s at %s", d.Name, d.Address)
-
-		deviceHandlers[d.Name] = &DeviceHandler{
-			Device: d,
-			Done: false,
+		// Delete finished device handlers.
+		var toDelete []string
+		for n,h := range deviceHandlers {
+			if h.Done {
+				Info.Printf("%s disconnected.", n)
+				toDelete = append(toDelete, n)
+			}
 		}
-		go deviceHandlers[d.Name].Handle()
+		for _,n := range toDelete {
+			Info.Printf("Removing %s.", n)
+			delete(deviceHandlers, n)
+		}
+
+		// Only check every 5 seconds so we don't use too much CPU.
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -183,8 +171,8 @@ func processData(s *bigquery.Service) {
 		addFloatValue("winddirection", jsonValue, data)
 		addFloatValue("rainfall", jsonValue, data)
 
-		// Got a data point
-		// TODO: Send data to Fluentd (or directly to BigQuery?)
+		// Send data directly to BigQuery
+		// TODO: Batch up data before sending it.
 		_, err = s.Tabledata.InsertAll(*bqproject, *bqdataset, *bqtable, &bigquery.TableDataInsertAllRequest{
 			Kind: "bigquery#tableDataInsertAllRequest",
 			Rows: []*bigquery.TableDataInsertAllRequestRows{
@@ -222,10 +210,21 @@ func apiServer() {
 			}
 
 			// TODO: Check if there is a duplicate name.
-			deviceChan <- Device{
+			d := Device{
 				Name: name,
 				Address: address,
 			}
+
+			// Add new device handlers.
+			Info.Printf("Got new device %s at %s", d.Name, d.Address)
+
+			deviceHandlers[d.Name] = &DeviceHandler{
+				Device: d,
+				Done: false,
+			}
+
+			// Create a goroutine to get data.
+			go deviceHandlers[d.Name].Handle()
         }),
     }))
 
@@ -254,6 +253,6 @@ func main() {
 	// Start the api server
 	go apiServer()
 
-	// Start the monitor
-	monitorDevices()
+	// Run a routine to clean up disconnected devices in the main thread.
+	cleanupDevices()
 }
