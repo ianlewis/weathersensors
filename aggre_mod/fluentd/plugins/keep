@@ -1,0 +1,2 @@
+This file is needed because the fluent/fluentd Dockerfile has ONBUILD
+instructions that try to copy plugins/* and fail without this file.
