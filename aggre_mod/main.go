@@ -14,17 +14,13 @@ import (
 
 	"github.com/gorilla/handlers"
     "github.com/najeira/ltsv"
-
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2/google"
-	"github.com/google/google-api-go-client/bigquery/v2"  // bigquery
+	"github.com/fluent/fluent-logger-golang/fluent"
 )
 
 var (
 	addr = flag.String("addr", "0.0.0.0:8000", "The address to bind the server to.")
-	bqproject = flag.String("project", "", "The BigQuery project.")
-	bqdataset = flag.String("dataset", "", "The BigQuery dataset.")
-	bqtable = flag.String("table", "", "The BigQuery table to stream to.")
+	fluentdHost = flag.String("fluentd-host", "localhost", "The fluentd host.")
+	fluentdPort = flag.Int("fluentd-port", 24224, "The fluentd port.")
 	timeout = flag.Int("timeout", 30, "The device read timeout in seconds.")
 	debug = flag.Bool("debug", false, "Enable debug logging.")
 )
@@ -137,7 +133,7 @@ func cleanupDevices() {
 	}
 }
 
-func addFloatValue(name string, jsonValue map[string]bigquery.JsonValue, data DataPoint) {
+func addFloatValue(name string, jsonValue map[string]interface{}, data DataPoint) {
 	if data.Data[name] != "" {
 		if val, err := strconv.ParseFloat(data.Data[name], 64); err == nil {
 			jsonValue[name] = val
@@ -148,13 +144,13 @@ func addFloatValue(name string, jsonValue map[string]bigquery.JsonValue, data Da
 }
 
 // Proceses data in parallel
-func processData(s *bigquery.Service) {
+func processData(logger *fluent.Fluent) {
 
 	for {
 		// Block on the data channel.
 		data := <-dataChan
 
-		jsonValue := make(map[string]bigquery.JsonValue)
+		jsonValue := make(map[string]interface{})
 
 		jsonValue["name"] = data.Device.Name
 
@@ -171,21 +167,13 @@ func processData(s *bigquery.Service) {
 		addFloatValue("winddirection", jsonValue, data)
 		addFloatValue("rainfall", jsonValue, data)
 
-		// Send data directly to BigQuery
-		// TODO: Batch up data before sending it.
-		_, err = s.Tabledata.InsertAll(*bqproject, *bqdataset, *bqtable, &bigquery.TableDataInsertAllRequest{
-			Kind: "bigquery#tableDataInsertAllRequest",
-			Rows: []*bigquery.TableDataInsertAllRequestRows{
-				&bigquery.TableDataInsertAllRequestRows{
-					Json: jsonValue,
-				},
-			},
-		}).Do()
+		// Send data directly to Fluentd 
+		logger.Post("aggre_mod.sensordata", jsonValue)
 
 		if err != nil {
-			Error.Printf("Could not send data from %s to BigQuery: %v", data.Device.Name, err)
+			Error.Printf("Could not send data from %s to Fluentd: %v", data.Device.Name, err)
 		} else {
-			Debug.Printf("Data sent to BigQuery (%s): %s", data.Device.Name, data.Data)
+			Debug.Printf("Data processed (%s): %s", data.Device.Name, data.Data)
 		}
 	}
 }
@@ -237,18 +225,16 @@ func main() {
 
 	initLogging()
 
-	ctx := context.Background()
-	client, err := google.DefaultClient(ctx, bigquery.BigqueryScope)
+	logger, err := fluent.New(fluent.Config{
+		FluentHost: *fluentdHost,
+		FluentPort: *fluentdPort,
+	})
 	if err != nil {
-		Error.Fatal("Could not create Bigquery client.", err)
-	}
-	service, err := bigquery.New(client)
-	if err != nil {
-		Error.Fatal("Could not create Bigquery client.", err)
+		Error.Fatal("Could not connect to Fluentd.", err)
 	}
 
 	// Start the thead to process data.
-	go processData(service)
+	go processData(logger)
 
 	// Start the api server
 	go apiServer()
