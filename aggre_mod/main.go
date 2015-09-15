@@ -21,6 +21,7 @@ var (
 	addr = flag.String("addr", "0.0.0.0:8000", "The address to bind the server to.")
 	fluentdHost = flag.String("fluentd-host", "localhost", "The fluentd host.")
 	fluentdPort = flag.Int("fluentd-port", 24224, "The fluentd port.")
+	fluentdRetryWait = flag.Int("fluentd-retry", 500, "Amount of time is milliseconds to wait between retries.")
 	timeout = flag.Int("timeout", 30, "The device read timeout in seconds.")
 	debug = flag.Bool("debug", false, "Enable debug logging.")
 )
@@ -144,7 +145,30 @@ func addFloatValue(name string, jsonValue map[string]interface{}, data DataPoint
 }
 
 // Proceses data in parallel
-func processData(logger *fluent.Fluent) {
+func processData() {
+	var logger *fluent.Fluent
+	var err error
+
+	// Continuously try to connect to Fluentd.
+	for {
+		Debug.Printf("Connecting to Fluentd (%s:%s)...", *fluentdHost, *fluentdPort)
+		logger, err = fluent.New(fluent.Config{
+			FluentHost: *fluentdHost,
+			FluentPort: *fluentdPort,
+			// Once we have a connection, the library will reconnect automatically
+			// if the connection is lost. However, it panics if it fails to connect
+			// more than MaxRetry times. To avoid panics crashing the server, retry
+			// many times before panicking.
+			MaxRetry: 240,
+			RetryWait: *fluentdRetryWait,
+		})
+		if err != nil {
+			Error.Printf("Could not connect to Fluentd: %v", err)
+			time.Sleep(time.Duration(*fluentdRetryWait) * time.Millisecond)
+		} else {
+			break
+		}
+	}
 
 	for {
 		// Block on the data channel.
@@ -168,9 +192,7 @@ func processData(logger *fluent.Fluent) {
 		addFloatValue("rainfall", jsonValue, data)
 
 		// Send data directly to Fluentd 
-		logger.Post("aggre_mod.sensordata", jsonValue)
-
-		if err != nil {
+		if err = logger.Post("aggre_mod.sensordata", jsonValue); err != nil {
 			Error.Printf("Could not send data from %s to Fluentd: %v", data.Device.Name, err)
 		} else {
 			Debug.Printf("Data processed (%s): %s", data.Device.Name, data.Data)
@@ -225,16 +247,8 @@ func main() {
 
 	initLogging()
 
-	logger, err := fluent.New(fluent.Config{
-		FluentHost: *fluentdHost,
-		FluentPort: *fluentdPort,
-	})
-	if err != nil {
-		Error.Fatal("Could not connect to Fluentd.", err)
-	}
-
 	// Start the thead to process data.
-	go processData(logger)
+	go processData()
 
 	// Start the api server
 	go apiServer()
