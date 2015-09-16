@@ -1,5 +1,13 @@
 # Makefile to build aggre_mod and related packages
 
+help:
+	@echo "Targets:"
+	@echo ""
+	@echo "aggre_mod: 		Build the server for the local architecture"
+	@echo "docker: 		Build a docker image for the local architecture"
+	@echo "aggre_mod_raspi: 	Build the server for the raspberry pi"
+	@echo "docker_raspi: 		Build the docker image for the raspberry pi"
+
 # Build the server for the local architecture
 aggre_mod:
 	CGO_ENABLED=0 go build -a -ldflags '-s' -installsuffix cgo .
@@ -13,7 +21,7 @@ docker_raspi: aggre_mod_arm
 	docker build -t aggre_mod_raspi .
 
 # Build the server for the raspberry pi
-aggre_mod_arm:
+aggre_mod_raspi:
 	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -a -ldflags '-s' -installsuffix cgo .
 
 clean:
