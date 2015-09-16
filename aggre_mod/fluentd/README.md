@@ -10,7 +10,8 @@ Put the service account key in the conf directory:
 
 Run the docker image like so:
 
-    $ docker run -d -v `pwd`/conf:/fluentd/etc/ \
+    $ docker run -d --name=aggre_mod-fluentd
+      -v `pwd`/conf:/fluentd/etc/ \
       -e GCP_PROJECT=<project> \
       -e GCP_SERVICE_ACCOUNT_EMAIL=<email> \
       -e GCP_BIGQUERY_DATASET=<dataset> \
