@@ -163,7 +163,7 @@ func processData() {
 
 	// Continuously try to connect to Fluentd.
 	for {
-		Debug.Printf("Connecting to Fluentd (%s:%s)...", *fluentdHost, *fluentdPort)
+		Debug.Printf("Connecting to Fluentd (%s:%d)...", *fluentdHost, *fluentdPort)
 		logger, err = fluent.New(fluent.Config{
 			FluentHost: *fluentdHost,
 			FluentPort: *fluentdPort,
@@ -231,7 +231,15 @@ func apiServer() {
 				return
 			}
 
-			// TODO: Check if there is a duplicate name.
+			if h, ok := deviceHandlers[name]; ok {
+				// If the device exists. Just update the address.
+				if address != h.Device.Address {
+					Info.Printf("Updated device %s to address %s", name, address)
+					h.Device.Address = address
+				}
+				return
+			}
+
 			d := Device{
 				Name: name,
 				Address: address,
@@ -253,7 +261,6 @@ func apiServer() {
 
 	// TODO: Add ability to delete a device by name.
 	// TODO: Add ability to list devices.
-
 
     Info.Printf("Listening on %s...", *addr)
     Error.Fatal(http.ListenAndServe(*addr, nil))
