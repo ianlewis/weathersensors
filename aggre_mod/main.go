@@ -17,11 +17,13 @@ import (
 	"github.com/fluent/fluent-logger-golang/fluent"
 )
 
+// TODO: Use FlagSet
 var (
 	addr = flag.String("addr", "0.0.0.0:8000", "The address to bind the server to.")
 	fluentdHost = flag.String("fluentd-host", "localhost", "The fluentd host.")
 	fluentdPort = flag.Int("fluentd-port", 24224, "The fluentd port.")
 	fluentdRetryWait = flag.Int("fluentd-retry", 500, "Amount of time is milliseconds to wait between retries.")
+	frequency = flag.Int("freq", 60, "Amount of time in seconds between device reads.")
 	timeout = flag.Int("timeout", 30, "The device read timeout in seconds.")
 	debug = flag.Bool("debug", false, "Enable debug logging.")
 )
@@ -62,6 +64,7 @@ func initLogging() {
 
 type DeviceHandler struct {
 	Device Device
+	Frequency time.Duration
 	Done bool
 }
 
@@ -71,43 +74,53 @@ var deviceHandlers = make(map[string]*DeviceHandler)
 func (dh *DeviceHandler) Handle() {
 	defer dh.Finish()
 
-	Info.Printf("Connecting to %s...", dh.Device.Address)
+	for {
+		dh.getValue()
+		time.Sleep(dh.Frequency)
+	}
+}
+
+func (dh *DeviceHandler) getValue() {
+	Debug.Printf("Connecting to %s...", dh.Device.Address)
 
 	c, err := net.DialTimeout("tcp", dh.Device.Address, time.Duration(*timeout) * time.Second)
 	if err != nil {
 		Error.Printf("Could not connect to %s: %v", dh.Device.Address, err)
 		return
-    }
+	}
 
-	Info.Printf("Connected to %s", dh.Device.Address)
+	Debug.Printf("Connected to %s", dh.Device.Address)
 
 	defer c.Close()
 
-    reader := ltsv.NewReader(bufio.NewReader(c))
+	reader := ltsv.NewReader(bufio.NewReader(c))
 
 	// Start reading data.
 	for {
 		// Set the read timeout.
 		c.SetDeadline(time.Now().Add(time.Duration(*timeout) * time.Second))
-        if data, err := reader.Read(); err == nil {
+		if data, err := reader.Read(); err == nil {
 			// Send the received data to the data channel.
 			dataChan <- DataPoint{
 				Device: dh.Device,
 				Data: data,
 			}
-        } else {
+		} else {
 			if err == io.EOF {
-				Warning.Printf("Connection to %s terminated", dh.Device.Address)
-				return
+				Debug.Printf("Connection to %s terminated", dh.Device.Address)
+				break
 			} else if e,ok := err.(net.Error); ok && e.Timeout() {
 				Warning.Printf("Connection to %s has timed out", dh.Device.Address)
-				return
+				break
 			}
 
 			Error.Printf("Error reading data from %s (%s): %v", dh.Device.Name, dh.Device.Address, err)
+			break
 		}
-    }
+
+	}
 }
+
 
 func (dh *DeviceHandler) Finish() {
 	dh.Done = true
@@ -120,7 +133,6 @@ func cleanupDevices() {
 		var toDelete []string
 		for n,h := range deviceHandlers {
 			if h.Done {
-				Info.Printf("%s disconnected.", n)
 				toDelete = append(toDelete, n)
 			}
 		}
@@ -209,7 +221,7 @@ func (w LogWriter) Write(b []byte) (int, error) {
 }
 
 func apiServer() {
-    http.Handle("/api/devices", handlers.CombinedLoggingHandler(LogWriter{Info}, handlers.MethodHandler{
+    http.Handle("/api/devices/", handlers.CombinedLoggingHandler(LogWriter{Info}, handlers.MethodHandler{
         "POST": http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
 			name := r.PostFormValue("name")
 			address := r.PostFormValue("address")
@@ -226,17 +238,22 @@ func apiServer() {
 			}
 
 			// Add new device handlers.
-			Info.Printf("Got new device %s at %s", d.Name, d.Address)
-
 			deviceHandlers[d.Name] = &DeviceHandler{
 				Device: d,
+				Frequency: time.Duration(*frequency) * time.Second,
 				Done: false,
 			}
 
 			// Create a goroutine to get data.
 			go deviceHandlers[d.Name].Handle()
+
+			Info.Printf("Registered new device %s at %s", d.Name, d.Address)
         }),
     }))
+
+	// TODO: Add ability to delete a device by name.
+	// TODO: Add ability to list devices.
+
 
     Info.Printf("Listening on %s...", *addr)
     Error.Fatal(http.ListenAndServe(*addr, nil))
