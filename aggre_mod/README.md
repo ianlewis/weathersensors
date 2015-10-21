@@ -5,7 +5,7 @@ forwards it on to Fluentd/BigQuery.
 
 # Architecture
 
-![Architecture](../docs/aggre_mod.png?raw=true)
+![Architecture](https://docs.google.com/drawings/d/1QY_T4k4DTx9b4ChLrcK1LF7cy9I0blKa10raLj2bux0/pub?w=960&amp;h=720)
 
 # Deploying
 
