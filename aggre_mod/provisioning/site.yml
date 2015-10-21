@@ -1,7 +1,0 @@
----
-- hosts: raspberrypi
-  roles: 
-    - role: spark-server
-      sudo: yes
-    # - role: aggre_mod
-    #  sudo: yes
