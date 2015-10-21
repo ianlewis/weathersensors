@@ -1,5 +1,7 @@
 # Makefile to build aggre_mod and related packages
 
+PROJECT=$(shell gcloud config list | grep project | awk '{ print $3 }')
+
 help:
 	@echo "Targets:"
 	@echo ""
@@ -14,15 +16,11 @@ aggre_mod:
 
 # Build a docker image for the local architecture
 docker: aggre_mod
-	docker build -t aggre_mod .
+	docker build -t aggremod .
+	docker tag aggremod asia.gcr.io/:`gcloud config list | grep project | awk '{ print $3 }'`/aggremod:`./aggre_mod -version`
 
-# Build the docker image for the raspberry pi
-docker_raspi: aggre_mod_arm
-	docker build -t aggre_mod_raspi .
-
-# Build the server for the raspberry pi
-aggre_mod_raspi:
-	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -a -ldflags '-s' -installsuffix cgo .
+push: docker
+	gcloud docker push asia.gcr.io/:`gcloud config list | grep project | awk '{ print $3 }'`/aggremod:`./aggre_mod -version`
 
 clean:
 	rm -rf aggre_mod
