@@ -1,25 +1,21 @@
 # aggre\_mod Fluentd Docker image
 
+# Build the Docker Image.
+
 Build the docker image:
 
-    $ docker build -t aggre_mod-fluentd .
+    $ docker build -t aggremod-fluentd .
 
-Put the service account key in the conf directory:
+Tag it and push it to Google Cloud Registry:
 
-    $ cp <keyname>.p12 conf/private_key.p12
+    $ docker tag aggremod-fluentd gcr.io/<project-id>/aggremod-fluentd:<version>
 
-Run the docker image like so:
+# Run the container
 
-    $ docker run -d --name=aggre_mod-fluentd
-      -v `pwd`/conf:/fluentd/etc/ \
-      -e GCP_PROJECT=<project> \
-      -e GCP_SERVICE_ACCOUNT_EMAIL=<email> \
-      -e GCP_BIGQUERY_DATASET=<dataset> \
-      -e GCP_BIGQUERY_TABLE=<table> \
-      -p 24224:24224 \
-      aggre_mod-fluentd
+The container is run as a sidecar with the aggre\_mod application. It requires
+that there be a [Kubernetes
+secrets](http://kubernetes.io/v1.0/docs/user-guide/secrets.html) mounted in the
+"/secrets" folder with the private key (p12) for the Google service account
+stored in a file called "private-key".
 
-Push the image:
-
-    $ docker tag asia.gcr.io/<project>/aggre_mod-fluentd:v1
-    $ gcloud docker push asia.gcr.io/<project>/aggre_mod-fluentd:v1
+See [aggremod-rc.yaml](../aggremod-rc.yaml) for details.

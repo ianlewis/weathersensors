@@ -8,5 +8,3 @@ CMD fluentd -c /fluentd/etc/$FLUENTD_CONF -p /fluentd/plugins $FLUENTD_OPT
 
 # NOTE: the fluent/fluentd image has ONBUILD commands that expect fluent.conf
 #       and a plugins directory with something in it.
-
-# TODO: Can i just install the fluent-plugin-bigquery plugin in the plugins directory?
