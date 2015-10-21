@@ -1,0 +1,28 @@
+{
+	"ImportPath": "bitbucket.org/IanLewis/homesensorsproject/aggre_mod",
+	"GoVersion": "go1.5.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/donovanhide/eventsource",
+			"Rev": "d8a3071799b98cacd30b6da92f536050ccfe6da4"
+		},
+		{
+			"ImportPath": "github.com/fluent/fluent-logger-golang/fluent",
+			"Comment": "v1.0.0-5-ge781f26",
+			"Rev": "e781f26187b040b56b1ce871bb4bbcca0d6abe5f"
+		},
+		{
+			"ImportPath": "github.com/najeira/ltsv",
+			"Rev": "40eb84a5b5d21afa8f26f357445d910c62011166"
+		},
+		{
+			"ImportPath": "github.com/philhofer/fwd",
+			"Rev": "4dbda5e2904d044d23cc4bef84e8360c458caf7f"
+		},
+		{
+			"ImportPath": "github.com/tinylib/msgp/msgp",
+			"Comment": "v1.0-alpha-47-gc46fbee",
+			"Rev": "c46fbee0675f25770e5f340dc9bc22bf4a108ad4"
+		}
+	]
+}

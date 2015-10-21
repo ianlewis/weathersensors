@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: aggremod-0
+  labels:
+    name: aggremod
+    version: "0"
+spec:
+  replicas: 1
+  selector:
+    name: aggremod
+    version: "0"
+  template:
+    metadata:
+      labels:
+        name: aggremod
+        version: "0"
+    spec:
+      containers:
+        - name: aggremod
+          image: asia.gcr.io/ianlewis-org/aggremod:0.6
+          volumeMounts:
+            - name: secret-volume
+              mountPath: /secrets
+        - name: fluentd
+          image: asia.gcr.io/ianlewis-org/aggremod-fluentd:latest-0
+          env:
+            - name: GCP_SERVICE_ACCOUNT_EMAIL
+              value: 2327118307-g1trnquhoguc6ier2bpt8u7ev3tkkuj8@developer.gserviceaccount.com
+            - name: GCP_PROJECT
+              value: ianlewis-org
+            - name: GCP_BIGQUERY_DATASET
+              value: homesensors
+            - name: GCP_BIGQUERY_TABLE
+              value: sensordata
+          ports:
+            - containerPort: 24224
+          volumeMounts:
+            - name: secret-volume
+              mountPath: /secrets
+      volumes: 
+        - name: secret-volume
+          secret:
+            secretName: aggremod-secret
