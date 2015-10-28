@@ -1,3 +1,7 @@
+// aggre_mod is an aggregator for device data.
+// It receives data via the Particle pub/sub API
+// and writes it to fluentd.
+
 package main
 
 import (
@@ -39,6 +43,8 @@ var (
 	Error   *log.Logger
 )
 
+// Initializes logging for the application. If debug logging is
+// turned off then debug log messages are discarded.
 func initLogging() {
 	debugOut := ioutil.Discard
 	if *debugLogging {
@@ -50,6 +56,8 @@ func initLogging() {
 	Error = log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime)
 }
 
+// Gets the access token for the Particle API by reading it from
+// the access token secret file.
 func getAccessToken() string {
 	f, err := os.Open(*accessTokenPath)
 	if err != nil {
@@ -71,6 +79,7 @@ type Message struct {
 	PublishedAt string `json:"published_at"`
 }
 
+// Takes a string containing a float value and adds it to a JSON object.
 func addFloatValue(name string, jsonValue map[string]interface{}, data map[string]string) {
 	if data[name] != "" {
 		if val, err := strconv.ParseFloat(data[name], 64); err == nil {
@@ -108,8 +117,8 @@ func connectToFluentd() *fluent.Fluent {
 	}
 }
 
+// Continuously tries to connect to the Particle API.
 func connectToParticle(accessToken string) *eventsource.Stream {
-	// Continuously try to connect to the stream.
 	for {
 		req, err := http.NewRequest("GET", PARTICLE_API_URL, nil)
 		if err != nil {
@@ -130,7 +139,7 @@ func connectToParticle(accessToken string) *eventsource.Stream {
 	}
 }
 
-// Proceses data in parallel
+// Processes data incoming from devices and sends them over to Fluentd
 func processData(accessToken string) {
 	var err error
 
@@ -171,7 +180,7 @@ func processData(accessToken string) {
 
 		data := records[0]
 
-		// Put the data into jsonValue and send to BigQuery
+		// Put the data into jsonValue and send to Fluentd
 		//////////////////////////////////////////////////////////////////
 		jsonValue := make(map[string]interface{})
 
