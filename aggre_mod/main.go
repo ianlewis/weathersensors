@@ -21,7 +21,7 @@ import (
 	"github.com/najeira/ltsv"
 )
 
-const VERSION = "0.6"
+const VERSION = "0.7"
 
 const PARTICLE_API_URL = "https://api.particle.io/v1/devices/events/weatherdata"
 
@@ -151,65 +151,67 @@ func processData(accessToken string) {
 
 	// Now actually process events.
 	for {
-		// Block on the data channel.
-		event := <-stream.Events
+		// Block on the data/error channels.
+		select {
+		case event := <-stream.Events:
+			// Unmarshall the JSON data from the Particle API.
+			//////////////////////////////////////////////////////////////////
+			var m Message
+			jsonData := event.Data()
+			// The particle API often sends newlines.
+			// Perhaps as a keep-alive mechanism.
+			if jsonData == "" {
+				continue
+			}
+			err = json.Unmarshal([]byte(jsonData), &m)
+			if err != nil {
+				Error.Printf("Could not parse message data: %v", err)
+				continue
+			}
 
-		// Unmarshall the JSON data from the Particle API.
-		//////////////////////////////////////////////////////////////////
-		var m Message
-		jsonData := event.Data()
-		// The particle API often sends newlines.
-		// Perhaps as a keep-alive mechanism.
-		if jsonData == "" {
-			continue
-		}
-		err = json.Unmarshal([]byte(jsonData), &m)
-		if err != nil {
-			Error.Printf("Could not parse message data: %v", err)
-			continue
-		}
+			// Read LTSV data from the device into map[string]string
+			//////////////////////////////////////////////////////////////////
+			reader := ltsv.NewReader(bytes.NewBufferString(m.Data))
+			records, err := reader.ReadAll()
+			if err != nil || len(records) != 1 {
+				Error.Printf("Error reading LTSV data: %v", err)
+				continue
+			}
 
-		// Read LTSV data from the device into map[string]string
-		//////////////////////////////////////////////////////////////////
-		reader := ltsv.NewReader(bytes.NewBufferString(m.Data))
-		records, err := reader.ReadAll()
-		if err != nil || len(records) != 1 {
-			Error.Printf("Error reading LTSV data: %v", err)
-			continue
-		}
+			data := records[0]
 
-		data := records[0]
+			// Put the data into jsonValue and send to Fluentd
+			//////////////////////////////////////////////////////////////////
+			jsonValue := make(map[string]interface{})
 
-		// Put the data into jsonValue and send to Fluentd
-		//////////////////////////////////////////////////////////////////
-		jsonValue := make(map[string]interface{})
+			jsonValue["deviceid"] = m.Id
 
-		jsonValue["deviceid"] = m.Id
+			timestamp, err := strconv.ParseInt(data["timestamp"], 10, 64)
+			if err != nil {
+				Error.Printf("Error reading timestamp: %v", err)
+				continue
+			}
 
-		timestamp, err := strconv.ParseInt(data["timestamp"], 10, 64)
-		if err != nil {
-			Error.Printf("Error reading timestamp: %v", err)
-			continue
-		}
+			jsonValue["timestamp"] = timestamp
+			addFloatValue("temp", jsonValue, data)
+			addFloatValue("humidity", jsonValue, data)
+			addFloatValue("pressure", jsonValue, data)
+			addFloatValue("windspeed", jsonValue, data)
+			addFloatValue("winddirection", jsonValue, data)
+			addFloatValue("rainfall", jsonValue, data)
 
-		jsonValue["timestamp"] = timestamp
-		addFloatValue("temp", jsonValue, data)
-		addFloatValue("humidity", jsonValue, data)
-		addFloatValue("pressure", jsonValue, data)
-		addFloatValue("windspeed", jsonValue, data)
-		addFloatValue("winddirection", jsonValue, data)
-		addFloatValue("rainfall", jsonValue, data)
-
-		// Send data directly to Fluentd
-		if err = logger.Post("aggre_mod.sensordata", jsonValue); err != nil {
-			Error.Printf("Could not send data from %s to Fluentd: %v", m.Id, err)
-		} else {
-			Debug.Printf("Data processed (%s): %s", m.Id, data)
+			// Send data directly to Fluentd
+			if err = logger.Post("aggre_mod.sensordata", jsonValue); err != nil {
+				Error.Printf("Could not send data from %s to Fluentd: %v", m.Id, err)
+			} else {
+				Debug.Printf("Data processed (%s): %s", m.Id, data)
+			}
+		case err := <-stream.Errors:
+			Error.Printf("Stream error: %v", err)
 		}
 	}
 }
 
-// A simple io.Writer wrapper around a logger so that we can use
 // the logger as an io.Writer
 type LogWriter struct{ *log.Logger }
 
