@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/donovanhide/eventsource"
@@ -25,14 +26,43 @@ const VERSION = "0.7"
 
 const PARTICLE_API_URL = "https://api.particle.io/v1/devices/events/weatherdata"
 
-// TODO: Use FlagSet
+func stringDefaults(def string, val ...string) string {
+	for i := range val {
+		if (val[i] != "") {
+			return val[i]
+		}
+	}
+	return def
+}
+
+func intDefaults(def int, val ...string) int {
+	for i := range val {
+		if val[i] != "" {
+			intVal, err := strconv.ParseInt(val[i], 10, 32)
+			if err == nil {
+				return int(intVal)
+			}
+		}
+	}
+	return def
+}
+
+func boolDefaults(def bool, val ...string) bool {
+	for i := range val {
+		if (val[i] != "") {
+			return strings.ToLower(val[i]) == "true"
+		}
+	}
+	return def
+}
+
 var (
-	fluentdHost       = flag.String("fluentd-host", "localhost", "The fluentd host.")
-	fluentdPort       = flag.Int("fluentd-port", 24224, "The fluentd port.")
-	fluentdRetryWait  = flag.Int("fluentd-retry", 500, "Amount of time is milliseconds to wait between retries.")
-	debugLogging      = flag.Bool("debug", false, "Enable debug logging.")
-	accessTokenPath   = flag.String("access-token-path", "", "The path to a file containing the Particle API access token.")
-	particleRetryWait = flag.Int("particle-retry", 500, "Amount of time is milliseconds to wait between retries.")
+	fluentdHost       = flag.String("fluentd-host", stringDefaults("localhost", os.Getenv("FLUENTD_HOST")), "The fluentd host.")
+	fluentdPort       = flag.Int("fluentd-port", intDefaults(24224, os.Getenv("FLUENTD_PORT")), "The fluentd port.")
+	fluentdRetryWait  = flag.Int("fluentd-retry", intDefaults(500, os.Getenv("FLUENTD_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
+	debugLogging      = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
+	accessTokenPath   = flag.String("access-token-path", stringDefaults("", os.Getenv("ACCESS_TOKEN_PATH")), "The path to a file containing the Particle API access token.")
+	particleRetryWait = flag.Int("particle-retry", intDefaults(500, os.Getenv("PARTICLE_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
 	version           = flag.Bool("version", false, "Print the version and exit.")
 )
 
