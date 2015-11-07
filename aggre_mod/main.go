@@ -1,6 +1,7 @@
 // aggre_mod is an aggregator for device data.
 // It receives data via the Particle pub/sub API
-// and writes it to fluentd.
+// and writes it to fluentd on the
+// "aggre_mod.sensordata" channel.
 
 package main
 
@@ -57,6 +58,8 @@ func boolDefaults(def bool, val ...string) bool {
 }
 
 var (
+	addr			  = flag.String("host", stringDefaults(":8080", os.Getenv("ADDRESS")), "The web server address.")
+
 	fluentdHost       = flag.String("fluentd-host", stringDefaults("localhost", os.Getenv("FLUENTD_HOST")), "The fluentd host.")
 	fluentdPort       = flag.Int("fluentd-port", intDefaults(24224, os.Getenv("FLUENTD_PORT")), "The fluentd port.")
 	fluentdRetryWait  = flag.Int("fluentd-retry", intDefaults(500, os.Getenv("FLUENTD_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
@@ -72,6 +75,11 @@ var (
 	Info    *log.Logger
 	Warning *log.Logger
 	Error   *log.Logger
+)
+
+var (
+	fluentdConnected = false
+	particleAPIConnected = false
 )
 
 // Initializes logging for the application. If debug logging is
@@ -131,6 +139,7 @@ func connectToFluentd() *fluent.Fluent {
 	var logger *fluent.Fluent
 
 	// Continuously try to connect to Fluentd.
+	backoff := time.Duration(*fluentdRetryWait) * time.Millisecond
 	for {
 		Debug.Printf("Connecting to Fluentd (%s:%d)...", *fluentdHost, *fluentdPort)
 		logger, err = fluent.New(fluent.Config{
@@ -145,7 +154,8 @@ func connectToFluentd() *fluent.Fluent {
 		})
 		if err != nil {
 			Error.Printf("Could not connect to Fluentd: %v", err)
-			time.Sleep(time.Duration(*fluentdRetryWait) * time.Millisecond)
+			time.Sleep(backoff)
+			backoff *= 2
 		} else {
 			return logger
 		}
@@ -154,6 +164,8 @@ func connectToFluentd() *fluent.Fluent {
 
 // Continuously tries to connect to the Particle API.
 func connectToParticle(accessToken string) *eventsource.Stream {
+	backoff := time.Duration(*particleRetryWait) * time.Millisecond
+
 	for {
 		req, err := http.NewRequest("GET", PARTICLE_API_URL, nil)
 		if err != nil {
@@ -167,7 +179,8 @@ func connectToParticle(accessToken string) *eventsource.Stream {
 		stream, err := eventsource.SubscribeWithRequest("", req)
 		if err != nil {
 			Error.Printf("Could not subscribe to Particle API stream: %v", err)
-			time.Sleep(time.Duration(*particleRetryWait) * time.Millisecond)
+			time.Sleep(backoff)
+			backoff *= 2
 		} else {
 			return stream
 		}
@@ -180,9 +193,11 @@ func processData(accessToken string) {
 
 	// Connect to Fluentd
 	logger := connectToFluentd()
+	fluentdConnected = true
 
 	// The stream object reconnects with exponential backoff.
 	stream := connectToParticle(accessToken)
+	particleAPIConnected = true
 
 	// Now actually process events.
 	for {
@@ -255,6 +270,28 @@ func (w LogWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+// Returns the health status of the app.
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	errorMsg := []string{}
+	if !fluentdConnected {
+		errorMsg = append(errorMsg, "fluentd: Not connected.")
+	}
+	if !particleAPIConnected {
+		errorMsg = append(errorMsg, "particle: Not connected.")
+	}
+
+	if fluentdConnected && particleAPIConnected {
+		fmt.Fprintf(w, "OK")
+	} else {
+		http.Error(w, strings.Join(errorMsg, "\n"), http.StatusInternalServerError)
+	}
+}
+
+// Prints the server verison
+func versionHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, VERSION)
+}
+
 func main() {
 	flag.Parse()
 
@@ -268,6 +305,13 @@ func main() {
 	// Get the API access token
 	accessToken := getAccessToken()
 
-	// Process data in the main thread.
-	processData(accessToken)
+	// Process data in the background.
+	go processData(accessToken)
+
+	// Start the web server
+	http.HandleFunc("/_status/healthz", healthHandler)
+	http.HandleFunc("/_status/version", versionHandler)
+
+	Info.Printf("Listening on %s...", *addr)
+	Error.Fatal(http.ListenAndServe(*addr, nil))
 }
