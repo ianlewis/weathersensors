@@ -67,7 +67,9 @@ void loop() {
     float humidity = dht.readHumidity();
     float temp = dht.readTemperature();
 
-    Particle.publish("weatherdata", String("timestamp:") + String(Time.now()) + String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity));
+    String data = String("timestamp:") + String(Time.now()) + String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity);
+    Particle.publish("weatherdata", data);
+    log(data);
 
     // Delay so that the READ LED stays on
     // for a little longer.
