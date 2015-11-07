@@ -61,6 +61,7 @@ var (
 	fluentdPort       = flag.Int("fluentd-port", intDefaults(24224, os.Getenv("FLUENTD_PORT")), "The fluentd port.")
 	fluentdRetryWait  = flag.Int("fluentd-retry", intDefaults(500, os.Getenv("FLUENTD_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
 	debugLogging      = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
+	accessToken       = flag.String("access-token", "", "The Particle API access token. If not specified access-token-path will be used. Intended for debugging.")
 	accessTokenPath   = flag.String("access-token-path", stringDefaults("", os.Getenv("ACCESS_TOKEN_PATH")), "The path to a file containing the Particle API access token.")
 	particleRetryWait = flag.Int("particle-retry", intDefaults(500, os.Getenv("PARTICLE_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
 	version           = flag.Bool("version", false, "Print the version and exit.")
@@ -89,6 +90,10 @@ func initLogging() {
 // Gets the access token for the Particle API by reading it from
 // the access token secret file.
 func getAccessToken() string {
+	if *accessToken != "" {
+		return *accessToken
+	}
+
 	f, err := os.Open(*accessTokenPath)
 	if err != nil {
 		Error.Fatal("Could not open access token file: ", err)
