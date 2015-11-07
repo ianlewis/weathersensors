@@ -82,6 +82,20 @@ var (
 	particleAPIConnected = false
 )
 
+type Device struct {
+	Id            string  `json:"id"`
+	Temp          float64 `json:"current_temp"`
+	Humidity      float64 `json:"current_humidity"`
+	Pressure      float64 `json:"current_pressure"`
+	WindSpeed     float64 `json:"current_windspeed"`
+	WindDirection float64 `json:"current_winddirection"`
+	Rainfall      float64 `json:"current_rainfall"`
+	LastSeen      int64   `json:"last_seen"`
+}
+
+// A list of known devices (devices that have been seen since last restart)
+var Devices = []Device{}
+
 // Initializes logging for the application. If debug logging is
 // turned off then debug log messages are discarded.
 func initLogging() {
@@ -250,6 +264,8 @@ func processData(accessToken string) {
 			addFloatValue("winddirection", jsonValue, data)
 			addFloatValue("rainfall", jsonValue, data)
 
+			updateDevice(jsonValue)
+
 			// Send data directly to Fluentd
 			if err = logger.Post("aggre_mod.sensordata", jsonValue); err != nil {
 				Error.Printf("Could not send data from %s to Fluentd: %v", m.Id, err)
@@ -260,6 +276,36 @@ func processData(accessToken string) {
 			Error.Printf("Stream error: %v", err)
 		}
 	}
+}
+
+// Updates a device with it's current status.
+func updateDevice(jsonValue map[string]interface{}) {
+	for _, d := range Devices {
+		if d.Id == jsonValue["deviceid"].(string) {
+			// Update known device
+			d.Temp = jsonValue["temp"].(float64)
+			d.Humidity = jsonValue["humidity"].(float64)
+			d.Pressure = jsonValue["pressure"].(float64)
+			d.WindSpeed = jsonValue["windspeed"].(float64)
+			d.WindDirection = jsonValue["winddirection"].(float64)
+			d.Rainfall = jsonValue["rainfall"].(float64)
+			d.LastSeen = time.Now().Unix()
+			return
+		}
+	}
+
+	// New device
+	newDevice := Device{
+		Id: jsonValue["deviceid"].(string),
+		Temp: jsonValue["temp"].(float64),
+		Humidity: jsonValue["humidity"].(float64),
+		Pressure: jsonValue["pressure"].(float64),
+		WindSpeed: jsonValue["windspeed"].(float64),
+		WindDirection: jsonValue["winddirection"].(float64),
+		Rainfall: jsonValue["rainfall"].(float64),
+		LastSeen: time.Now().Unix(),
+	}
+	Devices = append(Devices, newDevice)
 }
 
 // the logger as an io.Writer
@@ -292,6 +338,12 @@ func versionHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, VERSION)
 }
 
+func devicesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	dec := json.NewEncoder(w)
+	dec.Encode(Devices)
+}
+
 func main() {
 	flag.Parse()
 
@@ -311,6 +363,7 @@ func main() {
 	// Start the web server
 	http.HandleFunc("/_status/healthz", healthHandler)
 	http.HandleFunc("/_status/version", versionHandler)
+	http.HandleFunc("/api/devices", devicesHandler)
 
 	Info.Printf("Listening on %s...", *addr)
 	Error.Fatal(http.ListenAndServe(*addr, nil))
