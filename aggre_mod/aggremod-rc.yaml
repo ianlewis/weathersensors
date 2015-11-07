@@ -1,24 +1,24 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: aggremod-0
+  name: aggremod-1
   labels:
     name: aggremod
-    version: "0"
+    version: "1"
 spec:
   replicas: 1
   selector:
     name: aggremod
-    version: "0"
+    version: "1"
   template:
     metadata:
       labels:
         name: aggremod
-        version: "0"
+        version: "1"
     spec:
       containers:
         - name: aggremod
-          image: asia.gcr.io/ianlewis-org/aggremod:0.6
+          image: asia.gcr.io/ianlewis-org/aggremod:0.7
           volumeMounts:
             - name: secret-volume
               mountPath: /secrets
