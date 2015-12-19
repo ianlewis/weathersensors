@@ -2,3 +2,6 @@
 	path = indoor_mod/firmware/firmware
 	url = https://github.com/spark/firmware.git
 	branch = develop
+[submodule "outdoor_mod/firmware/firmware"]
+	path = outdoor_mod/firmware/firmware
+	url = https://github.com/spark/firmware.git
