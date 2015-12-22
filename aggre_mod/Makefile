@@ -2,19 +2,14 @@
 
 PROJECT=$(shell gcloud config list project | awk 'FNR==2 { print $$3 }')
 
-help:
-	@echo "Targets:"
-	@echo ""
-	@echo "aggre_mod: 		Build the server for the local architecture"
-	@echo "docker: 		Build a docker image for the local architecture"
-	@echo "push: 			Push the docker image to the repository"
+all: aggre_mod
 
 # Build the server for the local architecture
 aggre_mod:
 	CGO_ENABLED=0 go build -a -ldflags '-s' -installsuffix cgo .
 
 # Build a docker image for the local architecture
-docker: aggre_mod
+image: aggre_mod
 	docker build -t aggremod .
 	$(SHELL) -ec 'docker tag aggremod asia.gcr.io/$(PROJECT)/aggremod:`./aggre_mod -version`'
 
