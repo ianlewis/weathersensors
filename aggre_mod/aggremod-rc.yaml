@@ -1,20 +1,20 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: aggremod-1
+  name: aggremod-2
   labels:
     name: aggremod
-    version: "1"
+    version: "2"
 spec:
   replicas: 1
   selector:
     name: aggremod
-    version: "1"
+    version: "2"
   template:
     metadata:
       labels:
         name: aggremod
-        version: "1"
+        version: "2"
     spec:
       containers:
         - name: aggremod
@@ -22,6 +22,13 @@ spec:
           volumeMounts:
             - name: secret-volume
               mountPath: /secrets
+          resources:
+            requests:
+              memory: 25Mi
+              cpu: 25m
+            limits:
+              memory: 50Mi
+              cpu: 25m
         - name: fluentd
           image: asia.gcr.io/ianlewis-org/aggremod-fluentd:latest-0
           env:
@@ -38,6 +45,10 @@ spec:
           volumeMounts:
             - name: secret-volume
               mountPath: /secrets
+          resources:
+            limits:
+              memory: 50Mi
+              cpu: 50m
       volumes: 
         - name: secret-volume
           secret:
