@@ -1,20 +1,20 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: aggremod-2
+  name: aggremod-3
   labels:
     name: aggremod
-    version: "2"
+    version: "3"
 spec:
   replicas: 1
   selector:
     name: aggremod
-    version: "2"
+    version: "3"
   template:
     metadata:
       labels:
         name: aggremod
-        version: "2"
+        version: "3"
     spec:
       containers:
         - name: aggremod
@@ -47,7 +47,7 @@ spec:
               mountPath: /secrets
           resources:
             limits:
-              memory: 50Mi
+              memory: 150Mi
               cpu: 50m
       volumes: 
         - name: secret-volume
