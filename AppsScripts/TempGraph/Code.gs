@@ -69,8 +69,9 @@ function _runQuery(projectId, query) {
 }
 
 function doGet(e) {
-   var tmpl = HtmlService.createTemplateFromFile('Graph');
-   tmpl.projectId = e.parameter.project;
-   tmpl.deviceId = e.parameter.device;
-   return tmpl.evaluate().setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    var tmpl = HtmlService.createTemplateFromFile('Graph');
+    tmpl.projectId = e.parameter.project;
+    tmpl.deviceId = e.parameter.device;
+    tmpl.graphTitle = e.parameter.graphTitle || "Temperature/Humidity";
+    return tmpl.evaluate().setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
