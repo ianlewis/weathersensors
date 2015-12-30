@@ -10,6 +10,10 @@
 #container {
   margin: 0 15px;
 }
+#summary {
+  font-size: 24px;
+  margin-top: 0.15em;
+}
 #loading {
   width: 100%;
 }
@@ -27,6 +31,18 @@
 <div id="container" class="mdl-color-text--grey-600">
   <div class="title mdl-typography--title"><?= graphTitle ?></div>
   <div id="loading" class="mdl-progress mdl-js-progress mdl-progress__indeterminate"></div>
+
+  <div id="summary">
+    <div>
+      <i class="material-icons">wb_sunny</i>
+      <span id="temp"></span>
+    </div>
+    <div>
+      <i class="material-icons">wb_cloudy</i>
+      <span id="humidity"></span>
+    </div>
+  </div>
+
   <div id="chart"></div>
 </div>
 
@@ -128,7 +144,25 @@
   var chart = $("#chart").highcharts();
   $("#loading").show();
   chart.showLoading('Loading...');
+
   <? if (projectId && deviceId) { ?>
+
+  var currentDataLoad = $.Deferred();
+  var chartLoad = $.Deferred();
+
+  $.when(currentDataLoad, chartLoad).done(function() {
+    $("#loading").hide();
+  });
+  
+  google.script.run.withSuccessHandler(function(data) {
+    $("#temp").text(data.temp + " °C");
+    $("#humidity").text(data.humidity + " %");
+    currentDataLoad.resolve();
+  }).withFailureHandler(function(msg) {
+    currentDataLoad.resolve();
+    console.log('Error: ' + msg);
+  }).getCurrentData("<?= projectId ?>", "<?= deviceId ?>");
+
   google.script.run.withSuccessHandler(function(data) {
     var tempData = [];
     var humidityData = [];
@@ -138,10 +172,10 @@
     }
     chart.series[0].setData(tempData);
     chart.series[1].setData(humidityData);
-    $("#loading").hide();
+    chartLoad.resolve();
     chart.hideLoading();
   }).withFailureHandler(function(msg) {
-    $("#loading").hide();
+    chartLoad.resolve();
     chart.showLoading('Error: ' + msg);
   }).getTempData("<?= projectId ?>", "<?= deviceId ?>", 30);
   <? } else { ?>

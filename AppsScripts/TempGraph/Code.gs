@@ -1,4 +1,21 @@
 /**
+ * Returns the current data for the given project and device.
+ */
+function getCurrentData(projectId, deviceId) {
+    response = _runQuery(projectId,
+        "SELECT temp, humidity " +
+        "FROM" +
+        "  [" + projectId + ":homesensors.sensordata] " +
+        "WHERE" +
+        "  deviceid = \"" + deviceId + "\" " +
+        "ORDER BY timestamp DESC " +
+        "LIMIT 1;"
+    );
+
+    return response[0];
+}
+
+/**
  * Gets temperature data for the last N days averaged for each day.
  */
 function getTempData(projectId, deviceId, days) {
