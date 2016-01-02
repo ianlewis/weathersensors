@@ -8,11 +8,11 @@ using i2c. i2c is implemented as a firmware library in Wire.h
 /* Includes ------------------------------------------------------------------*/  
 
 #include "application.h"
-// #include "Adafruit_AM2315.h"
+#include "Adafruit_AM2315.h"
 #include "Adafruit_BMP085_U.h"
 
 // Initialize the AM2315
-// Adafruit_AM2315 am2315;
+Adafruit_AM2315 am2315;
 
 // Initialize the BMP180
 Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
@@ -44,10 +44,11 @@ void setup() {
     // Delay 15 seconds so we can connect for debugging
     delay(15000);
 
-    // while (!am2315.begin()) {
-    //     log("Sensor not found, check wiring & pullups!");
-    //     delay(1000);
-    // }
+    Serial.println("Detecting AM2315...");
+    if (!am2315.begin()) {
+        log("Sensor not found, check wiring & pullups!");
+        while(1);
+    }
 
     Serial.println("Detecting BMP180...");
     if (!bmp.begin()) {
@@ -63,8 +64,8 @@ void setup() {
 // unsigned int amID = 0;
 
 void loop() {
-    // log("Hum: "); Serial.println(am2315.readHumidity());
-    // log("Temp: "); Serial.println(am2315.readTemperature());
+    log("Hum: "); Serial.println(am2315.readHumidity());
+    log("Temp: "); Serial.println(am2315.readTemperature());
 
     /* Get a new sensor event */ 
     sensors_event_t event;
@@ -74,10 +75,6 @@ void loop() {
     if (event.pressure) {
         /* Display atmospheric pressure in hPa */
         Serial.print("Pressure: ");
-        Serial.print(event.pressure);
-        Serial.println(" hPa");
-
-        Serial.print("Altitude: ");
         Serial.print(event.pressure);
         Serial.println(" hPa");
     } else {
