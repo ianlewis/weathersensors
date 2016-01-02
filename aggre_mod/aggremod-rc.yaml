@@ -1,20 +1,20 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: aggremod-3
+  name: aggremod-4
   labels:
     name: aggremod
-    version: "3"
+    version: "4"
 spec:
   replicas: 1
   selector:
     name: aggremod
-    version: "3"
+    version: "4"
   template:
     metadata:
       labels:
         name: aggremod
-        version: "3"
+        version: "4"
     spec:
       containers:
         - name: aggremod
@@ -30,7 +30,7 @@ spec:
               memory: 50Mi
               cpu: 25m
         - name: fluentd
-          image: asia.gcr.io/ianlewis-org/aggremod-fluentd:latest-0
+          image: asia.gcr.io/ianlewis-org/aggremod-fluentd:latest-2
           env:
             - name: GCP_SERVICE_ACCOUNT_EMAIL
               value: 2327118307-g1trnquhoguc6ier2bpt8u7ev3tkkuj8@developer.gserviceaccount.com
@@ -45,6 +45,8 @@ spec:
           volumeMounts:
             - name: secret-volume
               mountPath: /secrets
+            - name: fluentd-file-buffer
+              mountPath: /var/log/fluent/
           resources:
             limits:
               memory: 150Mi
@@ -53,3 +55,8 @@ spec:
         - name: secret-volume
           secret:
             secretName: aggremod-secret
+        - name: fluentd-file-buffer
+          gcePersistentDisk:
+            # This GCE PD must already exist.
+            pdName: aggremod-fluentd-buffer
+            fsType: ext4
