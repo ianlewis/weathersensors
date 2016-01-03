@@ -23,7 +23,7 @@ import (
 	"github.com/najeira/ltsv"
 )
 
-const VERSION = "0.7"
+const VERSION = "0.8"
 
 const PARTICLE_API_URL = "https://api.particle.io/v1/devices/events/weatherdata"
 
@@ -77,7 +77,7 @@ var (
 	particleRetryWait = flag.Int("particle-retry", intDefaults(500, os.Getenv("PARTICLE_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
 
 	debugLogging      = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
-	deviceTimeout     = flag.Int("deviceTimout", intDefaults(300, os.Getenv("DEVICE_TIMEOUT")), "The device timeout in seconds.")
+	deviceTimeout     = flag.Int("deviceTimeout", intDefaults(300, os.Getenv("DEVICE_TIMEOUT")), "The device timeout in seconds.")
 
 	version           = flag.Bool("version", false, "Print the version and exit.")
 )
@@ -96,19 +96,19 @@ var (
 
 type Device struct {
 	Id            string  `json:"id"`
-	Temp          float64 `json:"current_temp"`
-	Humidity      float64 `json:"current_humidity"`
-	Pressure      float64 `json:"current_pressure"`
-	WindSpeed     float64 `json:"current_windspeed"`
-	WindDirection float64 `json:"current_winddirection"`
-	Rainfall      float64 `json:"current_rainfall"`
+	Temp          *float64 `json:"current_temp"`
+	Humidity      *float64 `json:"current_humidity"`
+	Pressure      *float64 `json:"current_pressure"`
+	WindSpeed     *float64 `json:"current_windspeed"`
+	WindDirection *float64 `json:"current_winddirection"`
+	Rainfall      *float64 `json:"current_rainfall"`
 	LastSeen      int64   `json:"last_seen"`
 	Active        bool    `json:"active"`
 }
 
 // A list of currently known devices
 var Devices = []Device{}
-var DeviceChan = make(chan map[string]interface{})
+var DeviceChan = make(chan map[string]interface{}, 100)
 
 // Initializes logging for the application. If debug logging is
 // turned off then debug log messages are discarded.
@@ -181,6 +181,7 @@ func connectToFluentd() *fluent.Fluent {
 			time.Sleep(backoff)
 			backoff *= 2
 		} else {
+			Debug.Printf("Connected to Fluentd (%s:%d)...", *fluentdHost, *fluentdPort)
 			return logger
 		}
 	}
@@ -206,6 +207,7 @@ func connectToParticle(accessToken string) *eventsource.Stream {
 			time.Sleep(backoff)
 			backoff *= 2
 		} else {
+			Debug.Printf("Connected to Particle API...")
 			return stream
 		}
 	}
@@ -253,6 +255,7 @@ func processData(accessToken string) {
 			}
 
 			data := records[0]
+			Debug.Println("Got data:", data)
 
 			// Put the data into jsonValue and send to Fluentd
 			//////////////////////////////////////////////////////////////////
@@ -274,7 +277,7 @@ func processData(accessToken string) {
 			addFloatValue("winddirection", jsonValue, data)
 			addFloatValue("rainfall", jsonValue, data)
 
-			updateDevice(jsonValue, true)
+			DeviceChan <- jsonValue
 
 			// Send data directly to Fluentd
 			if err = logger.Post("aggre_mod.sensordata", jsonValue); err != nil {
@@ -288,37 +291,129 @@ func processData(accessToken string) {
 	}
 }
 
+// Update devices periodically with the latest data.
+func updateDevices() {
+	// TODO: Need to split up this logic.
+	for {
+		select{
+		case deviceInfo := <-DeviceChan:
+			Debug.Println("Updating device:", deviceInfo["deviceid"])
+			updateDevice(deviceInfo)
+		default:
+			for i, d := range Devices {
+				active := time.Now().Unix() - d.LastSeen < int64(*deviceTimeout)
+				if d.Active && !active {
+					// Log a warning if a device is no longer active.
+					Warning.Println("Device no longer active:", d.Id)
+				}
+				// Update the active flag.
+				Devices[i].Active = active
+			}
+			// Throttle the loop if there is no data.
+			time.Sleep(1 * time.Second)
+		}
+	}
+}
 
 // Updates a device with it's current status.
-func updateDevice(jsonValue map[string]interface{}, active bool) {
+func updateDevice(jsonValue map[string]interface{}) {
+	lastSeen := jsonValue["timestamp"].(int64)
+	active := time.Now().Unix() - lastSeen < int64(*deviceTimeout)
+
 	for _, d := range Devices {
 		if d.Id == jsonValue["deviceid"].(string) {
 			// Update known device
-			d.Temp = jsonValue["temp"].(float64)
-			d.Humidity = jsonValue["humidity"].(float64)
-			d.Pressure = jsonValue["pressure"].(float64)
-			d.WindSpeed = jsonValue["windspeed"].(float64)
-			d.WindDirection = jsonValue["winddirection"].(float64)
-			d.Rainfall = jsonValue["rainfall"].(float64)
-			d.LastSeen = time.Now().Unix()
+			if temp, ok := jsonValue["temp"]; ok {
+				tempFloat := temp.(float64)
+				d.Temp = &tempFloat
+			} else {
+				d.Temp = nil
+			}
+			if humidity, ok := jsonValue["humidity"]; ok {
+				hFloat := humidity.(float64)
+				d.Humidity = &hFloat
+			} else {
+				d.Humidity = nil
+			}
+			if pressure, ok := jsonValue["pressure"]; ok {
+				pFloat := pressure.(float64)
+				d.Pressure = &pFloat
+			} else {
+				d.Pressure = nil
+			}
+			if windspeed, ok := jsonValue["windspeed"]; ok {
+				wsFloat := windspeed.(float64)
+				d.WindSpeed = &wsFloat
+			} else {
+				d.WindSpeed = nil
+			}
+			if winddirection, ok := jsonValue["winddirection"]; ok {
+				wdFloat := winddirection.(float64)
+				d.WindDirection = &wdFloat
+			} else {
+				d.WindDirection = nil
+			}
+			if rainfall, ok := jsonValue["rainfall"]; ok {
+				rFloat := rainfall.(float64)
+				d.Rainfall = &rFloat
+			} else {
+				d.Rainfall = nil
+			}
+			d.LastSeen = lastSeen
+			if d.Active && !active {
+				// Log a warning if a device is no longer active.
+				Warning.Println("Device no longer active:", d.Id)
+			}
 			d.Active = active
 			return
 		}
 	}
 
 	// New device
-	newDevice := Device{
+	d := Device{
 		Id: jsonValue["deviceid"].(string),
-		Temp: jsonValue["temp"].(float64),
-		Humidity: jsonValue["humidity"].(float64),
-		Pressure: jsonValue["pressure"].(float64),
-		WindSpeed: jsonValue["windspeed"].(float64),
-		WindDirection: jsonValue["winddirection"].(float64),
-		Rainfall: jsonValue["rainfall"].(float64),
-		LastSeen: time.Now().Unix(),
+		LastSeen: lastSeen,
 		Active: active,
 	}
-	Devices = append(Devices, newDevice)
+
+	if temp, ok := jsonValue["temp"]; ok {
+		tempFloat := temp.(float64)
+		d.Temp = &tempFloat
+	} else {
+		d.Temp = nil
+	}
+	if humidity, ok := jsonValue["humidity"]; ok {
+		hFloat := humidity.(float64)
+		d.Humidity = &hFloat
+	} else {
+		d.Humidity = nil
+	}
+	if pressure, ok := jsonValue["pressure"]; ok {
+		pFloat := pressure.(float64)
+		d.Pressure = &pFloat
+	} else {
+		d.Pressure = nil
+	}
+	if windspeed, ok := jsonValue["windspeed"]; ok {
+		wsFloat := windspeed.(float64)
+		d.WindSpeed = &wsFloat
+	} else {
+		d.WindSpeed = nil
+	}
+	if winddirection, ok := jsonValue["winddirection"]; ok {
+		wdFloat := winddirection.(float64)
+		d.WindDirection = &wdFloat
+	} else {
+		d.WindDirection = nil
+	}
+	if rainfall, ok := jsonValue["rainfall"]; ok {
+		rFloat := rainfall.(float64)
+		d.Rainfall = &rFloat
+	} else {
+		d.Rainfall = nil
+	}
+
+	Devices = append(Devices, d)
 }
 
 // the logger as an io.Writer
@@ -372,6 +467,9 @@ func main() {
 
 	// Process data in the background.
 	go processData(accessToken)
+
+	// Update device data periodically.
+	go updateDevices()
 
 	// Start the web server
 	http.HandleFunc("/_status/healthz", healthHandler)
