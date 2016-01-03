@@ -27,6 +27,9 @@ const VERSION = "0.7"
 
 const PARTICLE_API_URL = "https://api.particle.io/v1/devices/events/weatherdata"
 
+// Takes a default value and a list of string values and returns the first
+// non-empty value. If all values are empty or there are no values present
+// the default string value is returned.
 func stringDefaults(def string, val ...string) string {
 	for i := range val {
 		if (val[i] != "") {
@@ -36,6 +39,9 @@ func stringDefaults(def string, val ...string) string {
 	return def
 }
 
+// Takes a default int value and a list of string values and returns the first
+// non-empty value that can be converted to an integer. If all values are empty
+// or there are no values present the default int value is returned.
 func intDefaults(def int, val ...string) int {
 	for i := range val {
 		if val[i] != "" {
@@ -48,6 +54,9 @@ func intDefaults(def int, val ...string) int {
 	return def
 }
 
+// Takes a default bool value and a list of string values and returns the first
+// non-empty value converted to a boolean. If all values are empty or there are
+// no values present the default int value is returned.
 func boolDefaults(def bool, val ...string) bool {
 	for i := range val {
 		if (val[i] != "") {
@@ -63,10 +72,13 @@ var (
 	fluentdHost       = flag.String("fluentd-host", stringDefaults("localhost", os.Getenv("FLUENTD_HOST")), "The fluentd host.")
 	fluentdPort       = flag.Int("fluentd-port", intDefaults(24224, os.Getenv("FLUENTD_PORT")), "The fluentd port.")
 	fluentdRetryWait  = flag.Int("fluentd-retry", intDefaults(500, os.Getenv("FLUENTD_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
-	debugLogging      = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
-	accessToken       = flag.String("access-token", "", "The Particle API access token. If not specified access-token-path will be used. Intended for debugging.")
+
 	accessTokenPath   = flag.String("access-token-path", stringDefaults("", os.Getenv("ACCESS_TOKEN_PATH")), "The path to a file containing the Particle API access token.")
 	particleRetryWait = flag.Int("particle-retry", intDefaults(500, os.Getenv("PARTICLE_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
+
+	debugLogging      = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
+	deviceTimeout     = flag.Int("deviceTimout", intDefaults(300, os.Getenv("DEVICE_TIMEOUT")), "The device timeout in seconds.")
+
 	version           = flag.Bool("version", false, "Print the version and exit.")
 )
 
@@ -91,10 +103,12 @@ type Device struct {
 	WindDirection float64 `json:"current_winddirection"`
 	Rainfall      float64 `json:"current_rainfall"`
 	LastSeen      int64   `json:"last_seen"`
+	Active        bool    `json:"active"`
 }
 
-// A list of known devices (devices that have been seen since last restart)
+// A list of currently known devices
 var Devices = []Device{}
+var DeviceChan = make(chan map[string]interface{})
 
 // Initializes logging for the application. If debug logging is
 // turned off then debug log messages are discarded.
@@ -112,10 +126,6 @@ func initLogging() {
 // Gets the access token for the Particle API by reading it from
 // the access token secret file.
 func getAccessToken() string {
-	if *accessToken != "" {
-		return *accessToken
-	}
-
 	f, err := os.Open(*accessTokenPath)
 	if err != nil {
 		Error.Fatal("Could not open access token file: ", err)
@@ -264,7 +274,7 @@ func processData(accessToken string) {
 			addFloatValue("winddirection", jsonValue, data)
 			addFloatValue("rainfall", jsonValue, data)
 
-			updateDevice(jsonValue)
+			updateDevice(jsonValue, true)
 
 			// Send data directly to Fluentd
 			if err = logger.Post("aggre_mod.sensordata", jsonValue); err != nil {
@@ -278,8 +288,9 @@ func processData(accessToken string) {
 	}
 }
 
+
 // Updates a device with it's current status.
-func updateDevice(jsonValue map[string]interface{}) {
+func updateDevice(jsonValue map[string]interface{}, active bool) {
 	for _, d := range Devices {
 		if d.Id == jsonValue["deviceid"].(string) {
 			// Update known device
@@ -290,6 +301,7 @@ func updateDevice(jsonValue map[string]interface{}) {
 			d.WindDirection = jsonValue["winddirection"].(float64)
 			d.Rainfall = jsonValue["rainfall"].(float64)
 			d.LastSeen = time.Now().Unix()
+			d.Active = active
 			return
 		}
 	}
@@ -304,6 +316,7 @@ func updateDevice(jsonValue map[string]interface{}) {
 		WindDirection: jsonValue["winddirection"].(float64),
 		Rainfall: jsonValue["rainfall"].(float64),
 		LastSeen: time.Now().Unix(),
+		Active: active,
 	}
 	Devices = append(Devices, newDevice)
 }
