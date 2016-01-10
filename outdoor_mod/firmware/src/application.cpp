@@ -6,8 +6,8 @@ using i2c. i2c is implemented as a firmware library in Wire.h
 */
 
 // AM2315 doesn't seem to be working. Disable for now.
-#define ENABLE_AM2315 false
-#define ENABLE_BMP180 true
+#define ENABLE_AM2315 true
+#define ENABLE_BMP180 false
 
 /* Includes ------------------------------------------------------------------*/  
 
@@ -53,6 +53,9 @@ void log(String msg) {
     }
 }
 
+
+float temp, humidity;
+
 void setup() {
     Serial.begin(115200);
 
@@ -77,11 +80,6 @@ void setup() {
 #endif
 }
 
-// char str[8];
-// unsigned long result = 0;
-// unsigned int temp, humi = 0;
-// unsigned int amID = 0;
-
 void loop() {
     // Sync with the Spark server if necessary.
     syncTime();
@@ -92,8 +90,7 @@ void loop() {
     digitalWrite(READ_LED, HIGH);
 
 #if ENABLE_AM2315
-    float temp = am2315.readTemperature();
-    float humidity = am2315.readHumidity();
+    am2315.readTemperatureAndHumidity(temp, humidity);
 
     data += String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity);
 #endif
@@ -117,5 +114,6 @@ void loop() {
     delay(100);
     digitalWrite(READ_LED, LOW);
 
-    delay(1000 * 60 - 100);
+    //delay(1000 * 60 - 100);
+    delay(1000 * 10 - 100);
 }
