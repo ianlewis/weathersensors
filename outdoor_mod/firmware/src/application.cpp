@@ -14,6 +14,7 @@ using i2c. i2c is implemented as a firmware library in Wire.h
 #include "application.h"
 
 #if ENABLE_AM2315
+// https://github.com/adafruit/Adafruit_AM2315
 #include "Adafruit_AM2315.h"
 #endif
 
@@ -31,7 +32,7 @@ Adafruit_AM2315 am2315;
 Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085);
 #endif
 
-const int READ_LED = D0;
+const int READ_LED = D2;
 
 #define ONE_DAY_MILLIS (24 * 60 * 60 * 1000)
 unsigned long lastSync = millis();
@@ -41,9 +42,11 @@ unsigned long lastSync = millis();
  */
 void syncTime() {
     if (millis() - lastSync > ONE_DAY_MILLIS) {
+        log("Syncing time with cloud...");
         // Request time synchronization from the Particle Cloud
         Particle.syncTime();
         lastSync = millis();
+        log("Syncing time with cloud...");
     }
 }
 
@@ -63,21 +66,25 @@ void setup() {
     delay(15000);
 
 #if ENABLE_AM2315
-    Serial.println("Detecting AM2315...");
+    log("Detecting AM2315...");
     if (!am2315.begin()) {
         log("Sensor not found, check wiring & pullups!");
         while(1);
     }
+    log("AM2315 Detected.");
 #endif
 
 #if ENABLE_BMP180
-    Serial.println("Detecting BMP180...");
+    log("Detecting BMP180...");
     if (!bmp.begin()) {
         /* There was a problem detecting the BMP085 ... check your connections */
         Serial.print("Ooops, no BMP085 detected ... Check your wiring or I2C ADDR!");
         while(1);
     }
+    log("BMP180 Detected.");
 #endif
+
+    pinMode(READ_LED, OUTPUT);
 }
 
 void loop() {
