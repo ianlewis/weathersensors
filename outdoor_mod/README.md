@@ -9,3 +9,5 @@ The indoor sensor modules will use the [AM2315 - Encased I2C
 Temperature/Humidity Sensor](https://www.adafruit.com/products/1293). The
 outdoor module will also contain the [BMP180 Barometric
 Pressure/Temperature/Altitude Sensor](https://www.adafruit.com/products/1603)
+
+![Schematic](https://raw.githubusercontent.com/IanLewis/weathersensors/master/outdoor_mod/schematic/outdoor_mod_bb.png)
