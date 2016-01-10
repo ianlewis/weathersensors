@@ -7,7 +7,7 @@ using i2c. i2c is implemented as a firmware library in Wire.h
 
 // AM2315 doesn't seem to be working. Disable for now.
 #define ENABLE_AM2315 true
-#define ENABLE_BMP180 false
+#define ENABLE_BMP180 true
 
 /* Includes ------------------------------------------------------------------*/  
 
@@ -114,6 +114,5 @@ void loop() {
     delay(100);
     digitalWrite(READ_LED, LOW);
 
-    //delay(1000 * 60 - 100);
-    delay(1000 * 10 - 100);
+    delay(1000 * 60 - 100);
 }
