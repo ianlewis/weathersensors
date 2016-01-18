@@ -4,7 +4,7 @@ metadata:
   name: quota
 spec:
   hard:
-    memory: 750Mi
-    cpu: 300m 
+    memory: 300Mi
+    cpu: 100m 
     pods: 5
     resourcequotas: 1
