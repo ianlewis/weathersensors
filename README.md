@@ -10,9 +10,9 @@ The system will contain:
 1. 1 temperature/humidity/barameter sensor module for outside (maybe also wind & rainfall).
 
 Software will need to be written for each of the types of modules. Each of the
-sensor modules will contain a web server which will return the current data when
-queried. The Raspberry Pi module will have a client program which polls each
-of the sensors and streams that data to BigQuery.
+sensor modules will contain a web server which will return the current data
+when queried. The aggregator module will polls data for each of the sensors and
+streams that data to BigQuery.
 
 ![Architecture](https://docs.google.com/drawings/d/1QY_T4k4DTx9b4ChLrcK1LF7cy9I0blKa10raLj2bux0/pub?w=960&amp;h=720)
 

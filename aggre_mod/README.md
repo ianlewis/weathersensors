@@ -19,7 +19,7 @@ make, Docker, and the Google Cloud SDK installed:
 1. Create a cluster on Container Engine
 1. Create and push the container images:
 
-       $ make push
+       $ make clean image push
 
 1. Create the production namespace:
 
