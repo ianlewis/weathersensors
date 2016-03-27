@@ -45,15 +45,25 @@ void log(String msg) {
     }
 }
 
+
+double humidity = 0;
+double temp = 0;
+String localIP;
+String deviceType = String("indoor_mod");
+
 void setup() {
     // start listening for clients
     Serial.begin(115200);
 
+    pinMode(READ_LED, OUTPUT);
+
+    Particle.variable("deviceType", deviceType);
+    Particle.variable("humidity", humidity);
+    Particle.variable("temperature", temp);
+    Particle.variable("localIP", localIP);
+
     // Delay 15 seconds so we can connect for debugging
     delay(15000);
-
-    log("Starting DHT22 sensor...");
-    pinMode(READ_LED, OUTPUT);
 }
 
 // The main loop that gets run forever.
@@ -64,8 +74,9 @@ void loop() {
     // Turn on the READ LED.
     digitalWrite(READ_LED, HIGH);
 
-    float humidity = dht.readHumidity();
-    float temp = dht.readTemperature();
+    humidity = dht.readHumidity();
+    temp = dht.readTemperature();
+    localIP = String(WiFi.localIP());
 
     String data = String("timestamp:") + String(Time.now()) + String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity);
     Particle.publish("weatherdata", data);
