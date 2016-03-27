@@ -71,16 +71,40 @@ void loop() {
     // Sync with the Spark server if necessary.
     syncTime();
 
+    int extra = 0;
+
     // Turn on the READ LED.
     digitalWrite(READ_LED, HIGH);
 
-    humidity = dht.readHumidity();
-    temp = dht.readTemperature();
+    float fHumidity = dht.readHumidity();
+    float fTemp = dht.readTemperature();
+
     localIP = String(WiFi.localIP());
 
-    String data = String("timestamp:") + String(Time.now()) + String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity);
-    Particle.publish("weatherdata", data);
-    log(data);
+    // Sometimes the DHT sensor returns -4 for some reason.
+    // Retry up to 3 times.
+    int retries = 0;
+    while ((fTemp == -4 || fHumidity == -4) && retries < 3) {
+        // The DHT library only reads the sensor every 2 seconds.
+        // Wait over 2 seconds before attempting another read.
+        delay(2001);
+        extra += 2001;
+
+        fHumidity = dht.readHumidity();
+        fTemp = dht.readTemperature();
+
+        retries += 1;
+    }
+
+    // Ignore values that are exactly -4.
+    if (fTemp != -4 && fHumidity != -4) {
+        temp = fTemp;
+        humidity = fHumidity;
+
+        String data = String("timestamp:") + String(Time.now()) + String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity);
+        Particle.publish("weatherdata", data);
+        log(data);
+    }
 
     // Delay so that the READ LED stays on
     // for a little longer.
@@ -88,5 +112,5 @@ void loop() {
     digitalWrite(READ_LED, LOW);
 
     // Send data every 1 min.
-    delay(1000 * 60 - 100);
+    delay(1000 * 60 - 100 - extra);
 }
