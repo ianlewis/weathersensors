@@ -37,6 +37,12 @@ const int READ_LED = D2;
 #define ONE_DAY_MILLIS (24 * 60 * 60 * 1000)
 unsigned long lastSync = millis();
 
+void log(String msg) {
+    if (Serial.available()) {
+        Serial.println(String("[") + String(Time.now()) + String("] ") + msg);
+    }
+}
+
 /*
  * Sync the device time with the spark server.
  */
@@ -50,17 +56,22 @@ void syncTime() {
     }
 }
 
-void log(String msg) {
-    if (Serial.available()) {
-        Serial.println(String("[") + String(Time.now()) + String("] ") + msg);
-    }
-}
-
-
-float temp, humidity;
+double temp = 0;
+double humidity = 0;
+double pressure = 0;
+String localIP;
+String deviceType = String("outdoor_mod");
 
 void setup() {
     Serial.begin(115200);
+
+    pinMode(READ_LED, OUTPUT);
+
+    Particle.variable("deviceType", deviceType);
+    Particle.variable("humidity", humidity);
+    Particle.variable("temperature", temp);
+    Particle.variable("pressure", pressure);
+    Particle.variable("localIP", localIP);
 
     // Delay 15 seconds so we can connect for debugging
     delay(15000);
@@ -83,8 +94,6 @@ void setup() {
     }
     log("BMP180 Detected.");
 #endif
-
-    pinMode(READ_LED, OUTPUT);
 }
 
 void loop() {
@@ -96,8 +105,12 @@ void loop() {
     // Turn on the READ LED.
     digitalWrite(READ_LED, HIGH);
 
+    float fTemp, fHumidity;
+
 #if ENABLE_AM2315
-    am2315.readTemperatureAndHumidity(temp, humidity);
+    am2315.readTemperatureAndHumidity(fTemp, fHumidity);
+    temp = fTemp;
+    humidity = fHumidity;
 
     data += String("\ttemp:") + String(temp) + String("\thumidity:") + String(humidity);
 #endif
@@ -110,8 +123,11 @@ void loop() {
     /* Barometric pressure is measure in hPa */
     if (event.pressure) {
         data += String("\tpressure:") + String(event.pressure);
+        pressure = event.pressure;
     }
 #endif
+
+    localIP = String(WiFi.localIP());
 
     Particle.publish("weatherdata", data);
     log(data);
