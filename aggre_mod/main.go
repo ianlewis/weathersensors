@@ -32,7 +32,7 @@ const PARTICLE_API_URL = "https://api.particle.io/v1/devices/events/weatherdata"
 // the default string value is returned.
 func stringDefaults(def string, val ...string) string {
 	for i := range val {
-		if (val[i] != "") {
+		if val[i] != "" {
 			return val[i]
 		}
 	}
@@ -59,7 +59,7 @@ func intDefaults(def int, val ...string) int {
 // no values present the default int value is returned.
 func boolDefaults(def bool, val ...string) bool {
 	for i := range val {
-		if (val[i] != "") {
+		if val[i] != "" {
 			return strings.ToLower(val[i]) == "true"
 		}
 	}
@@ -67,19 +67,19 @@ func boolDefaults(def bool, val ...string) bool {
 }
 
 var (
-	addr			  = flag.String("host", stringDefaults(":8080", os.Getenv("ADDRESS")), "The web server address.")
+	addr = flag.String("host", stringDefaults(":8080", os.Getenv("ADDRESS")), "The web server address.")
 
-	fluentdHost       = flag.String("fluentd-host", stringDefaults("localhost", os.Getenv("FLUENTD_HOST")), "The fluentd host.")
-	fluentdPort       = flag.Int("fluentd-port", intDefaults(24224, os.Getenv("FLUENTD_PORT")), "The fluentd port.")
-	fluentdRetryWait  = flag.Int("fluentd-retry", intDefaults(500, os.Getenv("FLUENTD_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
+	fluentdHost      = flag.String("fluentd-host", stringDefaults("localhost", os.Getenv("FLUENTD_HOST")), "The fluentd host.")
+	fluentdPort      = flag.Int("fluentd-port", intDefaults(24224, os.Getenv("FLUENTD_PORT")), "The fluentd port.")
+	fluentdRetryWait = flag.Int("fluentd-retry", intDefaults(500, os.Getenv("FLUENTD_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
 
 	accessTokenPath   = flag.String("access-token-path", stringDefaults("", os.Getenv("ACCESS_TOKEN_PATH")), "The path to a file containing the Particle API access token.")
 	particleRetryWait = flag.Int("particle-retry", intDefaults(500, os.Getenv("PARTICLE_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
 
-	debugLogging      = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
-	deviceTimeout     = flag.Int("deviceTimeout", intDefaults(300, os.Getenv("DEVICE_TIMEOUT")), "The device timeout in seconds.")
+	debugLogging  = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
+	deviceTimeout = flag.Int("deviceTimeout", intDefaults(300, os.Getenv("DEVICE_TIMEOUT")), "The device timeout in seconds.")
 
-	version           = flag.Bool("version", false, "Print the version and exit.")
+	version = flag.Bool("version", false, "Print the version and exit.")
 )
 
 var (
@@ -90,20 +90,20 @@ var (
 )
 
 var (
-	fluentdConnected = false
+	fluentdConnected     = false
 	particleAPIConnected = false
 )
 
 type Device struct {
-	Id            string  `json:"id"`
+	Id            string   `json:"id"`
 	Temp          *float64 `json:"current_temp"`
 	Humidity      *float64 `json:"current_humidity"`
 	Pressure      *float64 `json:"current_pressure"`
 	WindSpeed     *float64 `json:"current_windspeed"`
 	WindDirection *float64 `json:"current_winddirection"`
 	Rainfall      *float64 `json:"current_rainfall"`
-	LastSeen      int64   `json:"last_seen"`
-	Active        bool    `json:"active"`
+	LastSeen      int64    `json:"last_seen"`
+	Active        bool     `json:"active"`
 }
 
 // A list of currently known devices
@@ -295,13 +295,13 @@ func processData(accessToken string) {
 func updateDevices() {
 	// TODO: Need to split up this logic.
 	for {
-		select{
+		select {
 		case deviceInfo := <-DeviceChan:
 			Debug.Println("Updating device:", deviceInfo["deviceid"])
 			updateDevice(deviceInfo)
 		default:
 			for i, d := range Devices {
-				active := time.Now().Unix() - d.LastSeen < int64(*deviceTimeout)
+				active := time.Now().Unix()-d.LastSeen < int64(*deviceTimeout)
 				if d.Active && !active {
 					// Log a warning if a device is no longer active.
 					Warning.Println("Device no longer active:", d.Id)
@@ -318,7 +318,7 @@ func updateDevices() {
 // Updates a device with it's current status.
 func updateDevice(jsonValue map[string]interface{}) {
 	lastSeen := jsonValue["timestamp"].(int64)
-	active := time.Now().Unix() - lastSeen < int64(*deviceTimeout)
+	active := time.Now().Unix()-lastSeen < int64(*deviceTimeout)
 
 	for _, d := range Devices {
 		if d.Id == jsonValue["deviceid"].(string) {
@@ -371,9 +371,9 @@ func updateDevice(jsonValue map[string]interface{}) {
 
 	// New device
 	d := Device{
-		Id: jsonValue["deviceid"].(string),
+		Id:       jsonValue["deviceid"].(string),
 		LastSeen: lastSeen,
-		Active: active,
+		Active:   active,
 	}
 
 	if temp, ok := jsonValue["temp"]; ok {
