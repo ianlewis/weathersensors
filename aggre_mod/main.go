@@ -23,7 +23,7 @@ import (
 	"github.com/najeira/ltsv"
 )
 
-const VERSION = "0.8"
+const VERSION = "0.9"
 
 const PARTICLE_API_URL = "https://api.particle.io/v1/devices/events/weatherdata"
 
