@@ -1,0 +1,42 @@
+[
+    {
+        "name": "deviceid",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "temp",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "humidity",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "winddirection",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "windspeed",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "rainfall",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "pressure",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED"
+    }
+]
