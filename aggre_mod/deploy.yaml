@@ -1,20 +1,13 @@
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
-  name: aggremod-7
-  labels:
-    name: aggremod
-    version: "7"
+  name: aggremod
 spec:
   replicas: 1
-  selector:
-    name: aggremod
-    version: "7"
   template:
     metadata:
       labels:
         name: aggremod
-        version: "7"
     spec:
       containers:
         - name: aggremod
@@ -42,13 +35,25 @@ spec:
           image: asia.gcr.io/ianlewis-org/aggremod-fluentd:latest-2
           env:
             - name: GCP_SERVICE_ACCOUNT_EMAIL
-              value: 2327118307-g1trnquhoguc6ier2bpt8u7ev3tkkuj8@developer.gserviceaccount.com
+              valueFrom:
+                configMapKeyRef:
+                  name: aggremod-conf
+                  key: service-account-email
             - name: GCP_PROJECT
-              value: ianlewis-org
+              valueFrom:
+                configMapKeyRef:
+                  name: aggremod-conf
+                  key: project-id
             - name: GCP_BIGQUERY_DATASET
-              value: homesensors
+              valueFrom:
+                configMapKeyRef:
+                  name: aggremod-conf
+                  key: bigquery-dataset
             - name: GCP_BIGQUERY_TABLE
-              value: sensordata
+              valueFrom:
+                configMapKeyRef:
+                  name: aggremod-conf
+                  key: bigquery-table
           ports:
             - containerPort: 24224
           volumeMounts:

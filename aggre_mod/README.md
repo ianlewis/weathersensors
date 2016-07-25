@@ -1,4 +1,4 @@
-# Aggre Mod
+# Aggregator Module
 
 This module is a data aggregator. It receives data published from devices and
 forwards it on to Fluentd/BigQuery.
@@ -7,7 +7,7 @@ forwards it on to Fluentd/BigQuery.
 
 ![Architecture](https://docs.google.com/drawings/d/1QY_T4k4DTx9b4ChLrcK1LF7cy9I0blKa10raLj2bux0/pub?w=960&amp;h=720)
 
-# Deploying
+# Setup
 
 aggre\_mod is deployed to [Google Container
 Engine](https://cloud.google.com/container-engine/) where it runs in a
@@ -16,15 +16,33 @@ Engine](https://cloud.google.com/container-engine/) where it runs in a
 The app is deployed via the following steps. You will need to have
 make, Docker, and the Google Cloud SDK installed:
 
-1. Create a cluster on Container Engine
-1. Create and push the container images:
+1. Create a BigQuery dataset.
 
-       $ make clean image push
+       bq mk --description "Sensors Dataset" weathersensors
 
-1. Create the production namespace:
+1. Create a BigQuery table.
 
-       $ kubectl create -f homesensors-prod-ns.yaml
+       bq mk --description "Sensor data" weathersensors.sensordata schema.json
 
-1. Create the aggre\_mod [Replication Controller](http://kubernetes.io/v1.0/docs/user-guide/replication-controller.html):
+1. Create and push the container images (make sure you have the Google Cloud SDK installed and configured for your project):
 
-       $ kubectl create -f aggremod-rc.yaml --namespace=homesensors-prod
+       make clean image push
+
+1. Create a service account and get the P12 private key. Save it to the file 'private-key'. Note the service account email.
+1. Create the configmap:
+
+       kubectl create configmap aggremod-conf \
+           --from-literal=service-account-email=[email] \
+           --from-literal=project-id=$(gcloud config list project | awk 'FNR==2 { print $3 }') \
+           --from-literal=bigquery-dataset=weathersensors \
+           --from-literal=bigquery-table=sensordata
+
+1. Create the secret:
+
+       kubectl create secret generic aggremod-secret \
+           --from-literal=token=[particle.io token] \
+           --from-file=private-key
+
+1. Create the aggre\_mod Deployment:
+
+       kubectl create -f deploy.yaml
