@@ -18,31 +18,31 @@ make, Docker, and the Google Cloud SDK installed:
 
 1. Create a BigQuery dataset.
 
-       bq mk --description "Sensors Dataset" weathersensors
+        bq mk --description "Sensors Dataset" weathersensors
 
 1. Create a BigQuery table.
 
-       bq mk --description "Sensor data" weathersensors.sensordata schema.json
+        bq mk --description "Sensor data" weathersensors.sensordata schema.json
 
 1. Create and push the container images (make sure you have the Google Cloud SDK installed and configured for your project):
 
-       make clean image push
+        make clean image push
 
 1. Create a service account and get the P12 private key. Save it to the file 'private-key'. Note the service account email.
 1. Create the configmap:
 
-       kubectl create configmap aggremod-conf \
-           --from-literal=service-account-email=[email] \
-           --from-literal=project-id=$(gcloud config list project | awk 'FNR==2 { print $3 }') \
-           --from-literal=bigquery-dataset=weathersensors \
-           --from-literal=bigquery-table=sensordata
+        kubectl create configmap aggremod-conf \
+            --from-literal=service-account-email=[email] \
+            --from-literal=project-id=$(gcloud config list project | awk 'FNR==2 { print $3 }') \
+            --from-literal=bigquery-dataset=weathersensors \
+            --from-literal=bigquery-table=sensordata
 
 1. Create the secret:
 
-       kubectl create secret generic aggremod-secret \
-           --from-literal=token=[particle.io token] \
-           --from-file=private-key
+        kubectl create secret generic aggremod-secret \
+            --from-literal=token=[particle.io token] \
+            --from-file=private-key
 
 1. Create the aggre\_mod Deployment:
 
-       kubectl create -f deploy.yaml
+        kubectl create -f deploy.yaml
