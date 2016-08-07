@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
         - name: aggremod
-          image: asia.gcr.io/ianlewis-org/aggremod:0.9
+          image: asia.gcr.io/ianlewis-org/aggremod:0.9.1
           livenessProbe:
             # an http probe
             httpGet:

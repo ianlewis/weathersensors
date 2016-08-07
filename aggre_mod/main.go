@@ -1,4 +1,4 @@
-// aggre_mod is an aggregator for device data.
+// Command aggre_mod is an aggregator for device data.
 // It receives data via the Particle pub/sub API
 // and writes it to fluentd on the
 // "aggre_mod.sensordata" channel.
@@ -23,11 +23,11 @@ import (
 	"github.com/najeira/ltsv"
 )
 
-const VERSION = "0.9"
+//go:generate go run scripts/gen.go
 
 const PARTICLE_API_URL = "https://api.particle.io/v1/devices/events/weatherdata"
 
-// Takes a default value and a list of string values and returns the first
+// stringDefaults takes a default value and a list of string values and returns the first
 // non-empty value. If all values are empty or there are no values present
 // the default string value is returned.
 func stringDefaults(def string, val ...string) string {
@@ -39,7 +39,7 @@ func stringDefaults(def string, val ...string) string {
 	return def
 }
 
-// Takes a default int value and a list of string values and returns the first
+// intDefaults takes a default int value and a list of string values and returns the first
 // non-empty value that can be converted to an integer. If all values are empty
 // or there are no values present the default int value is returned.
 func intDefaults(def int, val ...string) int {
@@ -54,7 +54,7 @@ func intDefaults(def int, val ...string) int {
 	return def
 }
 
-// Takes a default bool value and a list of string values and returns the first
+// boolDefaults takes a default bool value and a list of string values and returns the first
 // non-empty value converted to a boolean. If all values are empty or there are
 // no values present the default int value is returned.
 func boolDefaults(def bool, val ...string) bool {
@@ -76,17 +76,9 @@ var (
 	accessTokenPath   = flag.String("access-token-path", stringDefaults("", os.Getenv("ACCESS_TOKEN_PATH")), "The path to a file containing the Particle API access token.")
 	particleRetryWait = flag.Int("particle-retry", intDefaults(500, os.Getenv("PARTICLE_RETRY_WAIT")), "Amount of time is milliseconds to wait between retries.")
 
-	debugLogging  = flag.Bool("debug", boolDefaults(false, os.Getenv("DEBUG")), "Enable debug logging.")
 	deviceTimeout = flag.Int("deviceTimeout", intDefaults(300, os.Getenv("DEVICE_TIMEOUT")), "The device timeout in seconds.")
 
 	version = flag.Bool("version", false, "Print the version and exit.")
-)
-
-var (
-	Debug   *log.Logger
-	Info    *log.Logger
-	Warning *log.Logger
-	Error   *log.Logger
 )
 
 var (
@@ -110,30 +102,17 @@ type Device struct {
 var Devices = []Device{}
 var DeviceChan = make(chan map[string]interface{}, 100)
 
-// Initializes logging for the application. If debug logging is
-// turned off then debug log messages are discarded.
-func initLogging() {
-	debugOut := ioutil.Discard
-	if *debugLogging {
-		debugOut = os.Stdout
-	}
-	Debug = log.New(debugOut, "[DEBUG] ", log.Ldate|log.Ltime)
-	Info = log.New(os.Stdout, "[INFO] ", log.Ldate|log.Ltime)
-	Warning = log.New(os.Stderr, "[WARNING] ", log.Ldate|log.Ltime)
-	Error = log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime)
-}
-
 // Gets the access token for the Particle API by reading it from
 // the access token secret file.
 func getAccessToken() string {
 	f, err := os.Open(*accessTokenPath)
 	if err != nil {
-		Error.Fatal("Could not open access token file: ", err)
+		log.Fatal("Could not open access token file: ", err)
 	}
 	defer f.Close()
 	b, err := ioutil.ReadAll(f)
 	if err != nil {
-		Error.Fatal("Could not open access token file: ", err)
+		log.Fatal("Could not open access token file: ", err)
 	}
 	return string(b)
 }
@@ -146,18 +125,18 @@ type Message struct {
 	PublishedAt string `json:"published_at"`
 }
 
-// Takes a string containing a float value and adds it to a JSON object.
+// addFloatValue takes a string containing a float value and adds it to a JSON object.
 func addFloatValue(name string, jsonValue map[string]interface{}, data map[string]string) {
 	if data[name] != "" {
 		if val, err := strconv.ParseFloat(data[name], 64); err == nil {
 			jsonValue[name] = val
 		} else {
-			Error.Printf("Error parsing %s data: %v", name, err)
+			log.Printf("Error parsing %s data: %v", name, err)
 		}
 	}
 }
 
-// Continuously tries to connect to Fluentd.
+// connectToFluentd continuously tries to connect to Fluentd.
 func connectToFluentd() *fluent.Fluent {
 	var err error
 	var logger *fluent.Fluent
@@ -165,7 +144,7 @@ func connectToFluentd() *fluent.Fluent {
 	// Continuously try to connect to Fluentd.
 	backoff := time.Duration(*fluentdRetryWait) * time.Millisecond
 	for {
-		Debug.Printf("Connecting to Fluentd (%s:%d)...", *fluentdHost, *fluentdPort)
+		log.Printf("Connecting to Fluentd (%s:%d)...", *fluentdHost, *fluentdPort)
 		logger, err = fluent.New(fluent.Config{
 			FluentHost: *fluentdHost,
 			FluentPort: *fluentdPort,
@@ -177,43 +156,43 @@ func connectToFluentd() *fluent.Fluent {
 			RetryWait: *fluentdRetryWait,
 		})
 		if err != nil {
-			Error.Printf("Could not connect to Fluentd: %v", err)
+			log.Printf("Could not connect to Fluentd: %v", err)
 			time.Sleep(backoff)
 			backoff *= 2
 		} else {
-			Debug.Printf("Connected to Fluentd (%s:%d)...", *fluentdHost, *fluentdPort)
+			log.Printf("Connected to Fluentd (%s:%d)...", *fluentdHost, *fluentdPort)
 			return logger
 		}
 	}
 }
 
-// Continuously tries to connect to the Particle API.
+// connectToParticle continuously tries to connect to the Particle API.
 func connectToParticle(accessToken string) *eventsource.Stream {
 	backoff := time.Duration(*particleRetryWait) * time.Millisecond
 
 	for {
 		req, err := http.NewRequest("GET", PARTICLE_API_URL, nil)
 		if err != nil {
-			Error.Fatal("Could not create request: %v", err)
+			log.Fatalf("Could not create request: %v", err)
 			time.Sleep(time.Duration(*particleRetryWait) * time.Millisecond)
 			continue
 		}
 
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		Debug.Printf("Connecting to Particle API...")
+		log.Printf("Connecting to Particle API...")
 		stream, err := eventsource.SubscribeWithRequest("", req)
 		if err != nil {
-			Error.Printf("Could not subscribe to Particle API stream: %v", err)
+			log.Printf("Could not subscribe to Particle API stream: %v", err)
 			time.Sleep(backoff)
 			backoff *= 2
 		} else {
-			Debug.Printf("Connected to Particle API...")
+			log.Printf("Connected to Particle API...")
 			return stream
 		}
 	}
 }
 
-// Processes data incoming from devices and sends them over to Fluentd
+// processData processes data incoming from devices and sends them over to Fluentd
 func processData(accessToken string) {
 	var err error
 
@@ -241,7 +220,7 @@ func processData(accessToken string) {
 			}
 			err = json.Unmarshal([]byte(jsonData), &m)
 			if err != nil {
-				Error.Printf("Could not parse message data: %v", err)
+				log.Printf("Could not parse message data: %v", err)
 				continue
 			}
 
@@ -250,12 +229,12 @@ func processData(accessToken string) {
 			reader := ltsv.NewReader(bytes.NewBufferString(m.Data))
 			records, err := reader.ReadAll()
 			if err != nil || len(records) != 1 {
-				Error.Printf("Error reading LTSV data: %v", err)
+				log.Printf("Error reading LTSV data: %v", err)
 				continue
 			}
 
 			data := records[0]
-			Debug.Println("Got data:", data)
+			log.Printf("Got data: %v", data)
 
 			// Put the data into jsonValue and send to Fluentd
 			//////////////////////////////////////////////////////////////////
@@ -265,7 +244,7 @@ func processData(accessToken string) {
 
 			timestamp, err := strconv.ParseInt(data["timestamp"], 10, 64)
 			if err != nil {
-				Error.Printf("Error reading timestamp: %v", err)
+				log.Printf("Error reading timestamp: %v", err)
 				continue
 			}
 
@@ -281,30 +260,30 @@ func processData(accessToken string) {
 
 			// Send data directly to Fluentd
 			if err = logger.Post("aggre_mod.sensordata", jsonValue); err != nil {
-				Error.Printf("Could not send data from %s to Fluentd: %v", m.Id, err)
+				log.Printf("Could not send data from %s to Fluentd: %v", m.Id, err)
 			} else {
-				Debug.Printf("Data processed (%s): %s", m.Id, data)
+				log.Printf("Data processed (%s): %s", m.Id, data)
 			}
 		case err := <-stream.Errors:
-			Error.Printf("Stream error: %v", err)
+			log.Printf("Stream error: %v", err)
 		}
 	}
 }
 
-// Update devices periodically with the latest data.
+// updateDevices updates devices periodically with the latest data.
 func updateDevices() {
 	// TODO: Need to split up this logic.
 	for {
 		select {
 		case deviceInfo := <-DeviceChan:
-			Debug.Println("Updating device:", deviceInfo["deviceid"])
+			log.Println("Updating device:", deviceInfo["deviceid"])
 			updateDevice(deviceInfo)
 		default:
 			for i, d := range Devices {
 				active := time.Now().Unix()-d.LastSeen < int64(*deviceTimeout)
 				if d.Active && !active {
 					// Log a warning if a device is no longer active.
-					Warning.Println("Device no longer active:", d.Id)
+					log.Println("Device no longer active:", d.Id)
 				}
 				// Update the active flag.
 				Devices[i].Active = active
@@ -362,7 +341,7 @@ func updateDevice(jsonValue map[string]interface{}) {
 			d.LastSeen = lastSeen
 			if d.Active && !active {
 				// Log a warning if a device is no longer active.
-				Warning.Println("Device no longer active:", d.Id)
+				log.Println("Device no longer active:", d.Id)
 			}
 			d.Active = active
 			return
@@ -460,8 +439,6 @@ func main() {
 		return
 	}
 
-	initLogging()
-
 	// Get the API access token
 	accessToken := getAccessToken()
 
@@ -476,6 +453,6 @@ func main() {
 	http.HandleFunc("/_status/version", versionHandler)
 	http.HandleFunc("/api/devices", devicesHandler)
 
-	Info.Printf("Listening on %s...", *addr)
-	Error.Fatal(http.ListenAndServe(*addr, nil))
+	log.Printf("Listening on %s...", *addr)
+	log.Fatal(http.ListenAndServe(*addr, nil))
 }
