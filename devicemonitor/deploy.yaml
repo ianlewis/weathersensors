@@ -1,0 +1,61 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: devicemonitor
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: devicemonitor
+    spec:
+      containers:
+        - name: devicemonitor
+          image: asia.gcr.io/ianlewis-org/devicemonitor:0.0.2
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /secrets/service-account.json
+            - name: GCP_PROJECT 
+              valueFrom:
+                configMapKeyRef:
+                  name: devicemonitor-conf
+                  key: project-id
+            - name: ACCESS_TOKEN_PATH
+              value: /secrets/token
+            - name: DEVICE_LIST_PATH
+              value: /config/devices
+            - name: POLL_INTERVAL
+              value: "30"
+            - name: DEVICE_TIMEOUT
+              value: "300"
+          livenessProbe:
+            # an http probe
+            httpGet:
+              path: /_status/healthz
+              port: 8080
+            # length of time to wait for a pod to initialize
+            # after pod startup, before applying health checking
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: secret-volume
+              mountPath: /secrets
+            - name: config-volume
+              mountPath: /config
+            - name: certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+          resources:
+            limits:
+              memory: 15Mi
+              cpu: 10m
+      volumes: 
+        - name: certs
+          hostPath:
+            path: /etc/ssl/certs
+        - name: secret-volume
+          secret:
+            secretName: devicemonitor-secret
+        - name: config-volume
+          configMap:
+            name: devicemonitor-conf
