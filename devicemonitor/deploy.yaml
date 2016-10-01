@@ -25,7 +25,7 @@ spec:
             - name: DEVICE_LIST_PATH
               value: /config/devices
             - name: POLL_INTERVAL
-              value: "30"
+              value: "60"
             - name: DEVICE_TIMEOUT
               value: "300"
           livenessProbe:
@@ -47,7 +47,7 @@ spec:
               readOnly: true
           resources:
             limits:
-              memory: 15Mi
+              memory: 25Mi
               cpu: 10m
       volumes: 
         - name: certs
