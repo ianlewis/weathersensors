@@ -1,21 +1,44 @@
 # aggre\_mod Fluentd Docker image
 
-# Build the Docker Image.
+This directory holds the build artifacts for the Fluentd that runs with aggre\_mod.
+
+## Build the Docker Image
 
 Build the docker image:
 
-    $ docker build -t aggremod-fluentd .
+```shell
+$ docker build -t gcr.io/<project-id>/aggremod-fluentd:<version> .
+```
 
-Tag it and push it to Google Cloud Registry:
+or alternatively run make:
 
-    $ docker tag aggremod-fluentd gcr.io/<project-id>/aggremod-fluentd:<version>
+```shell
+$ make
+```
 
-# Run the container
+## Push the Docker Image
 
-The container is run as a sidecar with the aggre\_mod application. It requires
-that there be a [Kubernetes
-secrets](http://kubernetes.io/v1.0/docs/user-guide/secrets.html) mounted in the
-"/secrets" folder with the private key (p12) for the Google service account
-stored in a file called "private-key".
+Push the Docker image to GCR:
 
-See [aggremod-rc.yaml](../aggremod-rc.yaml) for details.
+```shell
+$ gcloud docker -- push gcr.io/<project-id>/aggremod-fluentd:<version>
+```
+
+or alternatively with make:
+
+```shell
+$ make push
+```
+
+## Run the container
+
+The container is meant to run as a sidecar with the aggre\_mod application. It requires that there be a [Kubernetes secrets](http://kubernetes.io/docs/user-guide/secrets/) with the path specified in the config.
+
+The following environment variables are used in fluentd's config.
+
+**GCP\_PROJECT**: The Google Cloud project id
+**GCP\_SERVICE\_ACCOUNT\_KEY\_PATH**: The path to the service account key JSON file.
+**GCP\_BIGQUERY\_DATASET**: The BigQuery dataset to write to.
+**GCP\_BIGQUERY\_TABLE**: The BigQuery table to write to.
+
+See [deploy.yaml](../deploy.yaml) for details about how it's used.

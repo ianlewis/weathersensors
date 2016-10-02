@@ -28,11 +28,10 @@ make, Docker, and the Google Cloud SDK installed:
 
         make clean image push
 
-1. Create a service account and get the P12 private key. Save it to the file 'private-key'. Note the service account email.
+1. [Create a service account](https://cloud.google.com/iam/docs/creating-managing-service-accounts) and get the JSON key. Save it to the file 'service-account.json'.
 1. Create the configmap:
 
         kubectl create configmap aggremod-conf \
-            --from-literal=service-account-email=[email] \
             --from-literal=project-id=$(gcloud config list project | awk 'FNR==2 { print $3 }') \
             --from-literal=bigquery-dataset=weathersensors \
             --from-literal=bigquery-table=sensordata
@@ -41,7 +40,7 @@ make, Docker, and the Google Cloud SDK installed:
 
         kubectl create secret generic aggremod-secret \
             --from-literal=token=[particle.io token] \
-            --from-file=private-key
+            --from-file=service-account.json
 
 1. Create the aggre\_mod Deployment:
 

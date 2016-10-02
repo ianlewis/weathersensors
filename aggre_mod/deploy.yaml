@@ -4,6 +4,8 @@ metadata:
   name: aggremod
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -29,16 +31,13 @@ spec:
               readOnly: true
           resources:
             limits:
-              memory: 15Mi
-              cpu: 10m
+              memory: 25Mi
+              cpu: 25m
         - name: fluentd
-          image: asia.gcr.io/ianlewis-org/aggremod-fluentd:latest-2
+          image: asia.gcr.io/ianlewis-org/aggremod-fluentd:0.12.29-1
           env:
-            - name: GCP_SERVICE_ACCOUNT_EMAIL
-              valueFrom:
-                configMapKeyRef:
-                  name: aggremod-conf
-                  key: service-account-email
+            - name: GCP_SERVICE_ACCOUNT_KEY_PATH
+              value: /secrets/service-account.json
             - name: GCP_PROJECT
               valueFrom:
                 configMapKeyRef:
@@ -57,9 +56,6 @@ spec:
           ports:
             - containerPort: 24224
           volumeMounts:
-            - name: certs
-              mountPath: /etc/ssl/certs
-              readOnly: true
             - name: secret-volume
               mountPath: /secrets
             - name: fluentd-file-buffer
@@ -67,7 +63,10 @@ spec:
           resources:
             limits:
               memory: 100Mi
-              cpu: 10m
+              cpu: 50m
+            limits:
+              memory: 100Mi
+              cpu: 100m
       volumes: 
         - name: certs
           hostPath:
