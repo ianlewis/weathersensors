@@ -47,8 +47,8 @@ spec:
               readOnly: true
           resources:
             limits:
-              memory: 25Mi
-              cpu: 10m
+              memory: 50Mi
+              cpu: 20m
       volumes: 
         - name: certs
           hostPath:
