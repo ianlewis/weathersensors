@@ -73,13 +73,22 @@ void loop() {
 
     int extra = 0;
 
+    localIP = String(WiFi.localIP());
+
+    // If not connected to the WiFi or Particle API then blink.
+    if (!WiFi.ready() || !Particle.connected()) {
+        digitalWrite(READ_LED, HIGH);
+        delay(1000);
+        digitalWrite(READ_LED, LOW);
+        delay(1000);
+        return;
+    }
+
     // Turn on the READ LED.
     digitalWrite(READ_LED, HIGH);
 
     float fHumidity = dht.readHumidity();
     float fTemp = dht.readTemperature();
-
-    localIP = String(WiFi.localIP());
 
     // Sometimes the DHT sensor returns -4 for some reason.
     // Retry up to 3 times.
