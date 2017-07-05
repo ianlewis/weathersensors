@@ -9,7 +9,7 @@ a DHT22 temperature/humidity sensor
 
 // PietteTech DHT22 library.
 // https://github.com/piettetech/PietteTech_DHT
-#include "PietteTech_DHT.h"
+#include "PietteTech_DHT/PietteTech_DHT.h"
 
 const int READ_LED = D0;
 const int DHTPIN = D1;

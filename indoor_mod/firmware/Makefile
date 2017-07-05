@@ -9,7 +9,7 @@ firmware: modules
 	$(MAKE) -C firmware/main all
 
 modules:
-	rm -f firmware/user/src/*
+	rm -rf firmware/user/src/*
 	cp -r src/* firmware/user/src/
 	$(MAKE) -C firmware/modules all
 
