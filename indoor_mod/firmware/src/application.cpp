@@ -6,6 +6,7 @@ a DHT22 temperature/humidity sensor
 /* Includes ------------------------------------------------------------------*/  
 
 #include "application.h"
+#include "version.h"
 
 // PietteTech DHT22 library.
 // https://github.com/piettetech/PietteTech_DHT
@@ -48,8 +49,10 @@ void log(String msg) {
 
 double humidity = 0;
 double temp = 0;
+String location = String("unknown");
 String localIP;
 String deviceType = String("indoor_mod");
+String version = String(gitversion);
 
 void setup() {
     // start listening for clients
@@ -59,8 +62,10 @@ void setup() {
 
     Particle.variable("deviceType", deviceType);
     Particle.variable("humidity", humidity);
+    Particle.variable("location", location);
     Particle.variable("temperature", temp);
     Particle.variable("localIP", localIP);
+    Particle.variable("version", version);
 
     // Delay 15 seconds so we can connect for debugging
     delay(15000);

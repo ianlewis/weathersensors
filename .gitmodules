@@ -1,7 +1,7 @@
-[submodule "indoor_mod/firmware/firmware"]
-	path = indoor_mod/firmware/firmware
-	url = https://github.com/spark/firmware.git
-	branch = develop
 [submodule "outdoor_mod/firmware/firmware"]
 	path = outdoor_mod/firmware/firmware
 	url = https://github.com/spark/firmware.git
+[submodule "indoor_mod/firmware/firmware"]
+	path = indoor_mod/firmware/firmware
+	url = https://github.com/particle-iot/firmware.git
+    branch = release/stable
