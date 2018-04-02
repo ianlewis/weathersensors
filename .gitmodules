@@ -5,3 +5,9 @@
 	path = indoor_mod/firmware/firmware
 	url = https://github.com/particle-iot/firmware.git
     branch = release/stable
+[submodule "indoor_mod/firmware/src/third_party/MQTT-TLS"]
+	path = indoor_mod/firmware/src/third_party/MQTT-TLS
+	url = https://github.com/hirotakaster/MQTT-TLS.git
+[submodule "indoor_mod/firmware/src/third_party/PietteTech_DHT"]
+	path = indoor_mod/firmware/src/third_party/PietteTech_DHT
+	url = https://github.com/piettetech/PietteTech_DHT.git
